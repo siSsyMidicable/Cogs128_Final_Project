@@ -76,3 +76,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
+
+export default function ProfileScreen() {
+  return <AuthProfile />;
+}

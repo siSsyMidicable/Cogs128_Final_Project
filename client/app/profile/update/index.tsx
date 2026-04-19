@@ -20,7 +20,7 @@ import { getImagePickerFile, getImagePickerPermission, getImagePickerResult } fr
 import { Media } from "@/types/api";
 import { filterEmptyValues } from "@/utils/form";
 
-import { updateProfileInputSchema, useUpdateProfile } from "../api/update-profile";
+import { updateProfileInputSchema, useUpdateProfile } from "@/features/profile/api/update-profile";
 
 const UpdateProfile = () => {
   /* ======================================== STATES */
