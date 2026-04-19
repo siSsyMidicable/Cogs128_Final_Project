@@ -32,7 +32,10 @@ export const LoginForm = () => {
     mode: "onChange",
   });
 
-  const onSubmit = handleSubmit((values) => login.mutate(values));
+  const onSubmit = handleSubmit(async (values) => {
+    await login.mutate(values);
+    router.replace("/");
+  });
 
   return (
     <>
