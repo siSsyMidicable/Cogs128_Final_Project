@@ -16,10 +16,10 @@ import { useAppTheme } from "@/lib/react-native-paper";
 import { TransactionStatus } from "@/types/api";
 import { formatDate, formatInvoiceItems, formatStripSuffix } from "@/utils/format";
 
-import { useInfiniteTransactions } from "../api/get-transactions";
-import { useUpdateTransaction } from "../api/update-transaction";
-import { OutgoingTransactionsSkeleton } from "../skeleton/outgoing-transactions";
-import { TransactionMenu } from "./transaction-menu";
+import { useInfiniteTransactions } from "@/features/transaction/api/get-transactions";
+import { useUpdateTransaction } from "@/features/transaction/api/update-transaction";
+import { OutgoingTransactionsSkeleton } from "@/features/transaction/skeleton/outgoing-transactions";
+import { TransactionMenu } from "@/features/transaction/components/outgoing-transaction-menu";
 
 export const OutgoingTransactions = ({ barter_service_id }: { barter_service_id?: string }) => {
   /* ======================================== STATES */
@@ -185,3 +185,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
 });
+
+export default function OutgoingTransactionsScreen() {
+  return <OutgoingTransactions />;
+}
