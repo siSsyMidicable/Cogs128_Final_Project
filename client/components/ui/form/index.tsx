@@ -1,9 +1,27 @@
-import React from 'react';
-import { Controller } from 'react-hook-form';
-import { TextInput } from 'react-native-paper';
-import { View, Text, StyleSheet } from 'react-native';
+import React from "react";
+import { Controller } from "react-hook-form";
+import { TextInput } from "react-native-paper";
+import { View, Text, StyleSheet } from "react-native";
 
-export function FormInput({ control, name, label, errors, secureTextEntry, inputMode, right }: any) {
+type Props = {
+  control: any;
+  name: string;
+  label: string;
+  errors?: string;
+  secureTextEntry?: boolean;
+  inputMode?: any;
+  right?: React.ReactNode;
+};
+
+export default function FormInput({
+  control,
+  name,
+  label,
+  errors,
+  secureTextEntry,
+  inputMode,
+  right,
+}: Props) {
   return (
     <Controller
       control={control}
@@ -26,8 +44,13 @@ export function FormInput({ control, name, label, errors, secureTextEntry, input
     />
   );
 }
-
 const styles = StyleSheet.create({
-  container: { marginBottom: 8 },
-  error: { color: 'red', marginTop: 4 },
+  container: {
+    marginBottom: 12,
+  },
+  error: {
+    color: "red",
+    marginTop: 4,
+    fontSize: 12,
+  },
 });

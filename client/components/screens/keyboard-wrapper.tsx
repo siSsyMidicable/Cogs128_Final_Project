@@ -1,16 +1,21 @@
-import React from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, ViewStyle } from 'react-native';
+import React from "react";
+import { KeyboardAvoidingView, Platform, ScrollView } from "react-native";
 
 type Props = {
-  children?: React.ReactNode;
-  contentContainerStyle?: ViewStyle;
-  style?: ViewStyle;
+  children: React.ReactNode;
+  contentContainerStyle?: any;
 };
 
-export default function KeyboardWrapper({ children, contentContainerStyle, style }: Props) {
+export default function KeyboardWrapper({
+  children,
+  contentContainerStyle,
+}: Props) {
   return (
-    <KeyboardAvoidingView style={{ flex: 1, ...style }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={[{ flexGrow: 1 }, contentContainerStyle]}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={{ flex: 1 }}
+    >
+      <ScrollView contentContainerStyle={contentContainerStyle}>
         {children}
       </ScrollView>
     </KeyboardAvoidingView>

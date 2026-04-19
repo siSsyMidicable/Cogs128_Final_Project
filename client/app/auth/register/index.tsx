@@ -145,7 +145,7 @@ export const RegisterForm = () => {
             disabled: register.isPending,
             loading: register.isPending,
           },
-          { label: "Already have an account? Login", onPress: () => router.replace("/login") },
+          { label: "Already have an account? Login", onPress: () => router.replace("/auth/login") },
         ]}
         style={styles.buttons}
       />

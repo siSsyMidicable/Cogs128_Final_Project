@@ -3,8 +3,15 @@
     "name": "SkillSwap",
     "slug": "skillswap",
     "version": "1.0.0",
-    "assetBundlePatterns": ["**/*"],
-    "ios": { "supportsTablet": true },
-    "android": { "package": "com.skillswap.client" }
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.skillswap.client"
+    },
+    "android": {
+      "package": "com.skillswap.client"
+    }
   }
 }
