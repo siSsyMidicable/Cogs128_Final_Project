@@ -13,7 +13,7 @@ import { FormError, FormInput } from "@/components/ui/form";
 import { useService } from "@/features/service/api/get-service";
 import { useUser } from "@/lib/auth/auth";
 
-import { createTransactionInputSchema, useCreateTransaction } from "../api/create-transaction";
+import { createTransactionInputSchema, useCreateTransaction } from "@/features/transaction/api/create-transaction";
 
 export const CreateTransaction = ({ barter_service_id }: { barter_service_id: string }) => {
   /* ======================================== STATES */
@@ -187,3 +187,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
 });
+
+export default function CreateTransactionScreen() {
+  return <CreateTransaction barter_service_id="" />;
+}

@@ -15,9 +15,9 @@ import { useUser } from "@/lib/auth/auth";
 import { useAppTheme } from "@/lib/react-native-paper";
 import { formatDate, formatInvoiceItems, formatSentenceCase } from "@/utils/format";
 
-import { useInfiniteTransactions } from "../api/get-transactions";
-import { TransactionsHistorySkeleton } from "../skeleton/transactions-history";
-import { TransactionMenu } from "./transaction-menu";
+import { useInfiniteTransactions } from "@/features/transaction/api/get-transactions";
+import { TransactionsHistorySkeleton } from "@/features/transaction/skeleton/transactions-history";
+import { TransactionMenu } from "@/features/transaction/components/history-transaction-menu";
 
 export const TransactionsHistory = ({ barter_service_id }: { barter_service_id?: string }) => {
   /* ======================================== STATES */
@@ -179,3 +179,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
 });
+
+export default function TransactionsHistoryScreen() {
+  return <TransactionsHistory />;
+}

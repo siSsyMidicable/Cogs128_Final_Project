@@ -89,3 +89,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
 });
+
+export default function LoginScreen() {
+  return <LoginForm />;
+}
