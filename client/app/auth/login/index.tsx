@@ -36,7 +36,7 @@ export const LoginForm = () => {
 
   const onSubmit = handleSubmit(async (values) => {
     await login.mutate(values);
-    router.replace("/");
+    router.replace("/transaction");
   });
 
   return (
@@ -46,9 +46,9 @@ export const LoginForm = () => {
       <KeyboardWrapper contentContainerStyle={styles.container}>
         <View style={styles.headerCard}>
           <Text style={styles.headerEyebrow}>SKILLSWAP</Text>
-          <Text style={styles.headerTitle}>Welcome Back</Text>
+          <Text style={styles.headerTitle}>Login</Text>
           <Text style={styles.headerSubtitle}>
-            Sign in to continue your swaps.
+            Enter your email and password to sign in.
           </Text>
         </View>
 
