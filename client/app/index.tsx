@@ -1,11 +1,5 @@
-import { useEffect } from "react";
-import { router } from "expo-router";
-import { View } from "react-native";
+import { Redirect } from "expo-router";
 
 export default function Home() {
-  useEffect(() => {
-    router.replace("/auth/login");
-  }, []);
-
-  return <View style={{ flex: 1, backgroundColor: "#111" }} />;
+  return <Redirect href="/auth/login" />;
 }
