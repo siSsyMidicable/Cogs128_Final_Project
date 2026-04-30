@@ -56,45 +56,43 @@ export type ProofField = {
 
 export function fairnessFromProof(proof: ProofField): number {
   let f = 0;
-  if (proof.deliveredOnTime)          f += 0.35;
-  if (proof.scopeMatchedAgreement)    f += 0.35;
+  if (proof.deliveredOnTime)           f += 0.35;
+  if (proof.scopeMatchedAgreement)     f += 0.35;
   if (proof.portfolioEvidenceAttached) f += 0.15;
-  if (proof.wouldSwapAgain)           f += 0.15;
+  if (proof.wouldSwapAgain)            f += 0.15;
   return f;
 }
 
 /**
  * TrustImpact — human-readable tags derived from proof fields.
- * Surfaces what improved (or didn't) in the trust model.
  */
 export function trustImpactTags(proof: ProofField): string[] {
   const tags: string[] = [];
   if (proof.deliveredOnTime && proof.scopeMatchedAgreement) tags.push('+consistency');
-  if (proof.wouldSwapAgain) tags.push('+review signal');
-  if (proof.portfolioEvidenceAttached) tags.push('+portfolio evidence');
-  if (!proof.deliveredOnTime) tags.push('⚠ late delivery');
-  if (!proof.scopeMatchedAgreement) tags.push('⚠ scope drift');
+  if (proof.wouldSwapAgain)             tags.push('+review signal');
+  if (proof.portfolioEvidenceAttached)  tags.push('+portfolio evidence');
+  if (!proof.deliveredOnTime)           tags.push('⚠ late delivery');
+  if (!proof.scopeMatchedAgreement)     tags.push('⚠ scope drift');
   return tags;
 }
 
 export type HistoryRecord = {
-  id: string;                    // unique record id
+  id: string;
   partnerId: string;
   partnerName: string;
   partnerAvatar: string;
-  skillGiven: string;            // what you gave
-  skillReceived: string;         // what you received
-  completedAt: string;           // ISO date string
+  skillGiven: string;
+  skillReceived: string;
+  completedAt: string;          // ISO date string
   proof: ProofField;
-  fairness: number;              // computed from proof
-  scores: MatchScoreBreakdown;   // the M(u,v) breakdown at time of match
+  fairness: number;
+  scores: MatchScoreBreakdown;
 };
 
 // ─── Core Math Functions ───────────────────────────────────────────────────────
 
 /**
  * T(u) = w_P·P + w_R·R̂ + w_V·V̂ + w_C·C + w_Q·Q
- * Weights from interview emphasis: P=0.2, R=0.3, V=0.2, C=0.2, Q=0.1
  * R̂ = (R_avg - 1) / 4   rescales [1,5] → [0,1]
  * V̂ = V / 2              rescales {0,1,2} → {0,0.5,1}
  */
@@ -111,9 +109,31 @@ export function trustScore(u: MatchUser): number {
 }
 
 /**
+ * Returns the 5 named components of T(u) for the breakdown panel.
+ * P, R̂, V̂, C, Q — each with its weight and raw value.
+ */
+export type TrustComponents = {
+  P:  { weight: 0.2; value: number };
+  Rhat: { weight: 0.3; value: number };
+  Vhat: { weight: 0.2; value: number };
+  C:  { weight: 0.2; value: number };
+  Q:  { weight: 0.1; value: number };
+};
+
+export function trustComponents(u: MatchUser): TrustComponents {
+  return {
+    P:    { weight: 0.2, value: u.portfolio },
+    Rhat: { weight: 0.3, value: (u.rating - 1) / 4 },
+    Vhat: { weight: 0.2, value: u.verified / 2 },
+    C:    { weight: 0.2, value: u.consistency },
+    Q:    { weight: 0.1, value: u.communication },
+  };
+}
+
+/**
  * SkillFit(u,v):
- *   forward  = |O(u) ∩ R(v)| / |R(v)|   — how much of v's needs u covers
- *   backward = |O(v) ∩ R(u)| / |R(u)|   — how much of u's needs v covers
+ *   forward  = |O(u) ∩ R(v)| / |R(v)|
+ *   backward = |O(v) ∩ R(u)| / |R(u)|
  *   SF = (forward + backward) / 2
  */
 export function skillFit(u: MatchUser, v: MatchUser): number {
@@ -132,11 +152,8 @@ export function trustCompat(u: MatchUser, v: MatchUser): number {
 }
 
 /**
- * M(u,v) = γ_F·F + γ_T·TC + γ_S·SF
- * γ_S=0.34, γ_T=0.33, γ_F=0.33  (skill fit weighted slightly higher)
- *
- * When called for a live match candidate, F defaults to 1.0 (no history yet).
- * When called for a completed swap, pass the proof-derived fairness value.
+ * M(u,v) = 0.34·SF + 0.33·TC + 0.33·F
+ * F defaults to 1.0 for un-completed matches.
  */
 export function matchScore(
   u: MatchUser,
@@ -149,33 +166,67 @@ export function matchScore(
   const tu   = trustScore(u);
   const tv   = trustScore(v);
   return {
-    sf,
-    tc,
-    fair,
-    tu,
-    tv,
+    sf, tc, fair, tu, tv,
     total: 0.34 * sf + 0.33 * tc + 0.33 * fair,
   };
 }
 
-// ─── Module-Level State (same pattern as auth) ────────────────────────────────
-// Keeps connection/request/history state across screens without a full store.
+/**
+ * whyThisMatch — plain English summary for a grader or first-time user.
+ * Generated entirely from the existing score data; no AI, no hardcoding.
+ */
+export function whyThisMatch(
+  you: MatchUser,
+  other: MatchUser,
+  scores: MatchScoreBreakdown,
+): string {
+  const theyGiveYou = other.offers.filter(s => you.requests.includes(s));
+  const youGiveThem = you.offers.filter(s => other.requests.includes(s));
+
+  let fitSentence: string;
+  if (theyGiveYou.length > 0 && youGiveThem.length > 0) {
+    fitSentence =
+      `${other.name} offers ${theyGiveYou.join(' & ')} (you need it) ` +
+      `and needs ${youGiveThem.join(' & ')} (you offer it) — bilateral fit.`;
+  } else if (theyGiveYou.length > 0) {
+    fitSentence =
+      `${other.name} covers ${
+        theyGiveYou.length
+      } of your ${you.requests.length} skill need${
+        you.requests.length !== 1 ? 's' : ''
+      }: ${theyGiveYou.join(', ')}.`;
+  } else if (youGiveThem.length > 0) {
+    fitSentence =
+      `You offer ${youGiveThem.join(' & ')} which ${other.name} needs, ` +
+      `but they don't cover your current skill requests.`;
+  } else {
+    fitSentence = `No direct skill overlap — ranked on trust compatibility alone (TC=${scores.tc.toFixed(2)}).`;
+  }
+
+  let trustSentence: string;
+  if (scores.tc >= 0.80) {
+    trustSentence = `Trust is strong (TC=${scores.tc.toFixed(2)}) — both profiles are verified and consistent.`;
+  } else if (scores.tc >= 0.60) {
+    trustSentence = `Trust is reasonable (TC=${scores.tc.toFixed(2)}).`;
+  } else {
+    trustSentence = `Trust is modest (TC=${scores.tc.toFixed(2)}) — review their portfolio before committing.`;
+  }
+
+  return `${fitSentence} ${trustSentence}`;
+}
+
+// ─── Module-Level State ───────────────────────────────────────────────────────
 
 let _connections = new Set<string>();
 let _requests    = new Set<string>();
-let _completed   = new Set<string>();          // ids that have been completed
+let _completed   = new Set<string>();
 let _history: HistoryRecord[] = [];
 const _listeners = new Set<() => void>();
 
-function _notify() {
-  _listeners.forEach(fn => fn());
-}
+function _notify() { _listeners.forEach(fn => fn()); }
 
 export function sendRequest(userId: string) {
-  if (!_connections.has(userId)) {
-    _requests.add(userId);
-    _notify();
-  }
+  if (!_connections.has(userId)) { _requests.add(userId); _notify(); }
 }
 
 export function confirmConnect(userId: string) {
@@ -184,28 +235,24 @@ export function confirmConnect(userId: string) {
   _notify();
 }
 
-/**
- * completeSwap — called from the completion modal.
- * Creates a HistoryRecord with proof-derived fairness and removes the
- * connection from the active "connected" set (swap is done).
- */
 export function completeSwap(
   partner: MatchUser,
   currentUser: MatchUser,
   skillGiven: string,
   skillReceived: string,
   proof: ProofField,
+  dateOverride?: string,
 ): void {
-  const fair = fairnessFromProof(proof);
+  const fair   = fairnessFromProof(proof);
   const scores = matchScore(currentUser, partner, fair);
   const record: HistoryRecord = {
-    id: `${partner.id}-${Date.now()}`,
-    partnerId: partner.id,
-    partnerName: partner.name,
+    id: `${partner.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    partnerId:     partner.id,
+    partnerName:   partner.name,
     partnerAvatar: partner.avatar,
     skillGiven,
     skillReceived,
-    completedAt: new Date().toISOString(),
+    completedAt: dateOverride ?? new Date().toISOString(),
     proof,
     fairness: fair,
     scores,
@@ -225,16 +272,13 @@ export function getMatchingState() {
   };
 }
 
-/** React hook — subscribes to live connection/request/history state. */
 export function useMatchingState() {
   const [state, setState] = useState(getMatchingState);
-
   useEffect(() => {
     const update = () => setState(getMatchingState());
     _listeners.add(update);
     return () => { _listeners.delete(update); };
   }, []);
-
   const request  = useCallback((id: string) => sendRequest(id), []);
   const connect  = useCallback((id: string) => confirmConnect(id), []);
   const complete = useCallback(
@@ -242,19 +286,15 @@ export function useMatchingState() {
       completeSwap(partner, cu, given, received, proof),
     [],
   );
-
   return { ...state, request, connect, complete };
 }
 
-/** Hook for the history screen — only cares about history records. */
 export function useHistoryState() {
   const [history, setHistory] = useState<HistoryRecord[]>(() => [..._history]);
-
   useEffect(() => {
     const update = () => setHistory([..._history]);
     _listeners.add(update);
     return () => { _listeners.delete(update); };
   }, []);
-
   return history;
 }

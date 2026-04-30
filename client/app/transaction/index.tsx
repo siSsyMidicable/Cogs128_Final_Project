@@ -1,11 +1,13 @@
 /**
  * SkillSwap — Match Hub
- * Replaces the old transaction system.
  *
  * Shows users ranked by M(you, v) = 0.34·SF + 0.33·TC + 0.33·F
- * Each card has an expandable "Show Math" panel with live formula values.
- * Connected cards gain a "Complete Swap" button that opens a transparency
- * proof modal — no star ratings, only verifiable claims.
+ *
+ * Features:
+ *   • "Show Math" — expandable dark panel with live formula substitution
+ *   • "Why This Match?" — plain English auto-generated summary per card
+ *   • Trust Score Breakdown — tap the Trust bar label to expand T(u) components
+ *   • Complete Swap — bottom-sheet modal with proof checkboxes + live F preview
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -29,6 +31,8 @@ import { useUser } from '@/lib/auth/auth';
 import {
   matchScore,
   useMatchingState,
+  trustComponents,
+  whyThisMatch,
   type MatchUser,
   type MatchScoreBreakdown,
   type ProofField,
@@ -39,7 +43,9 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+const MONO: any = Platform.OS === 'ios' ? 'Courier' : 'monospace';
+
+// ─── ScoreBar ─────────────────────────────────────────────────────────────────
 
 function ScoreBar({ value, color }: { value: number; color: string }) {
   const pct = `${Math.min(100, Math.round(value * 100))}%` as any;
@@ -50,6 +56,8 @@ function ScoreBar({ value, color }: { value: number; color: string }) {
   );
 }
 
+// ─── Chip ─────────────────────────────────────────────────────────────────────
+
 function Chip({ label, variant }: { label: string; variant: 'offer' | 'request' | 'match' }) {
   const bg = variant === 'offer' ? '#1f4642' : variant === 'request' ? '#FF8C42' : '#61d8cc';
   const fg = variant === 'offer' ? '#61d8cc' : '#000';
@@ -59,6 +67,8 @@ function Chip({ label, variant }: { label: string; variant: 'offer' | 'request' 
     </View>
   );
 }
+
+// ─── MathPanel ────────────────────────────────────────────────────────────────
 
 function MathPanel({ scores, user }: { scores: MatchScoreBreakdown; user: MatchUser }) {
   return (
@@ -99,7 +109,50 @@ function MathPanel({ scores, user }: { scores: MatchScoreBreakdown; user: MatchU
   );
 }
 
-// ─── Completion Modal ─────────────────────────────────────────────────────────
+// ─── TrustBreakdown ───────────────────────────────────────────────────────────
+// Expanded view of T(u) into its 5 weighted components.
+
+function TrustBreakdown({ user }: { user: MatchUser }) {
+  const comp = trustComponents(user);
+  const rows: { label: string; sym: string; weight: number; value: number }[] = [
+    { label: 'Portfolio',     sym: 'P',   weight: comp.P.weight,    value: comp.P.value },
+    { label: 'Avg Rating',    sym: 'R̂',  weight: comp.Rhat.weight, value: comp.Rhat.value },
+    { label: 'Verification',  sym: 'V̂',  weight: comp.Vhat.weight, value: comp.Vhat.value },
+    { label: 'Consistency',   sym: 'C',   weight: comp.C.weight,    value: comp.C.value },
+    { label: 'Communication', sym: 'Q',   weight: comp.Q.weight,    value: comp.Q.value },
+  ];
+  return (
+    <View style={styles.trustBreakdown}>
+      <Text style={styles.trustBreakdownTitle}>T({user.name}) = 0.2P + 0.3R̂ + 0.2V̂ + 0.2C + 0.1Q</Text>
+      {rows.map(r => (
+        <View key={r.sym} style={styles.trustBreakdownRow}>
+          <Text style={styles.trustBreakdownSym}>{r.sym}</Text>
+          <Text style={styles.trustBreakdownLabel}>{r.label}</Text>
+          <View style={styles.barTrack}>
+            <View style={[styles.barFill, { width: `${Math.round(r.value * 100)}%` as any, backgroundColor: '#4f98a3' }]} />
+          </View>
+          <Text style={styles.trustBreakdownVal}>{r.value.toFixed(2)}</Text>
+          <Text style={styles.trustBreakdownWeight}>×{r.weight}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// ─── WhyCard ──────────────────────────────────────────────────────────────────
+// Plain English explanation. Auto-generated — nothing hardcoded.
+
+function WhyCard({ you, other, scores }: { you: MatchUser; other: MatchUser; scores: MatchScoreBreakdown }) {
+  const text = useMemo(() => whyThisMatch(you, other, scores), [you, other, scores]);
+  return (
+    <View style={styles.whyCard}>
+      <Text style={styles.whyLabel}>WHY THIS MATCH</Text>
+      <Text style={styles.whyText}>{text}</Text>
+    </View>
+  );
+}
+
+// ─── CompletionModal ──────────────────────────────────────────────────────────
 
 type CompletionModalProps = {
   visible: boolean;
@@ -109,21 +162,12 @@ type CompletionModalProps = {
   onSubmit: (given: string, received: string, proof: ProofField) => void;
 };
 
-function CompletionModal({
-  visible,
-  partner,
-  currentUser,
-  onClose,
-  onSubmit,
-}: CompletionModalProps) {
-  const [given, setGiven] = useState('');
+function CompletionModal({ visible, partner, currentUser, onClose, onSubmit }: CompletionModalProps) {
+  const [given, setGiven]     = useState('');
   const [received, setReceived] = useState('');
-  const [proof, setProof] = useState<ProofField>({
-    deliveredOnTime: false,
-    scopeMatchedAgreement: false,
-    portfolioEvidenceAttached: false,
-    wouldSwapAgain: false,
-    notes: '',
+  const [proof, setProof]     = useState<ProofField>({
+    deliveredOnTime: false, scopeMatchedAgreement: false,
+    portfolioEvidenceAttached: false, wouldSwapAgain: false, notes: '',
   });
 
   const toggle = (key: keyof Omit<ProofField, 'notes'>) =>
@@ -138,25 +182,18 @@ function CompletionModal({
   function handleSubmit() {
     if (!given.trim() || !received.trim()) return;
     onSubmit(given.trim(), received.trim(), proof);
-    // reset
-    setGiven('');
-    setReceived('');
-    setProof({
-      deliveredOnTime: false,
-      scopeMatchedAgreement: false,
-      portfolioEvidenceAttached: false,
-      wouldSwapAgain: false,
-      notes: '',
-    });
+    setGiven(''); setReceived('');
+    setProof({ deliveredOnTime: false, scopeMatchedAgreement: false,
+               portfolioEvidenceAttached: false, wouldSwapAgain: false, notes: '' });
   }
 
   if (!partner) return null;
 
   const checks: { key: keyof Omit<ProofField, 'notes'>; label: string; weight: string }[] = [
-    { key: 'deliveredOnTime',          label: 'Delivered on time',          weight: '×0.35' },
-    { key: 'scopeMatchedAgreement',    label: 'Scope matched our agreement', weight: '×0.35' },
+    { key: 'deliveredOnTime',           label: 'Delivered on time',           weight: '×0.35' },
+    { key: 'scopeMatchedAgreement',     label: 'Scope matched our agreement', weight: '×0.35' },
     { key: 'portfolioEvidenceAttached', label: 'Portfolio / evidence attached', weight: '×0.15' },
-    { key: 'wouldSwapAgain',           label: 'Would swap again',             weight: '×0.15' },
+    { key: 'wouldSwapAgain',            label: 'Would swap again',             weight: '×0.15' },
   ];
 
   return (
@@ -164,40 +201,22 @@ function CompletionModal({
       <View style={modal.overlay}>
         <View style={modal.sheet}>
           <View style={modal.handle} />
-
           <Text style={modal.title}>Complete Swap with {partner.name}</Text>
           <Text style={modal.subtitle}>
             Fairness is computed from verifiable fields — not a star rating that can be gamed.
           </Text>
-
           <ScrollView showsVerticalScrollIndicator={false}>
-            {/* Skill fields */}
             <Text style={modal.fieldLabel}>Skill you gave</Text>
-            <TextInput
-              style={modal.input}
-              value={given}
-              onChangeText={setGiven}
-              placeholder={currentUser.offers[0] ?? 'e.g. Web Dev'}
-              placeholderTextColor="#607876"
-            />
-
+            <TextInput style={modal.input} value={given} onChangeText={setGiven}
+              placeholder={currentUser.offers[0] ?? 'e.g. Web Dev'} placeholderTextColor="#607876" />
             <Text style={modal.fieldLabel}>Skill you received</Text>
-            <TextInput
-              style={modal.input}
-              value={received}
-              onChangeText={setReceived}
-              placeholder={partner.offers[0] ?? 'e.g. Graphic Design'}
-              placeholderTextColor="#607876"
-            />
-
-            {/* Proof checkboxes */}
+            <TextInput style={modal.input} value={received} onChangeText={setReceived}
+              placeholder={partner.offers[0] ?? 'e.g. Graphic Design'} placeholderTextColor="#607876" />
             <Text style={[modal.fieldLabel, { marginTop: 16 }]}>Transparency proof</Text>
             {checks.map(c => (
-              <Pressable
-                key={c.key}
+              <Pressable key={c.key}
                 style={[modal.checkRow, proof[c.key] && modal.checkRowActive]}
-                onPress={() => toggle(c.key)}
-              >
+                onPress={() => toggle(c.key)}>
                 <View style={[modal.checkbox, proof[c.key] && modal.checkboxChecked]}>
                   {proof[c.key] && <Text style={modal.checkmark}>✓</Text>}
                 </View>
@@ -205,8 +224,6 @@ function CompletionModal({
                 <Text style={modal.checkWeight}>{c.weight}</Text>
               </Pressable>
             ))}
-
-            {/* Live fairness preview */}
             <View style={modal.fairnessRow}>
               <Text style={modal.fairnessLabel}>
                 F = 0.35·{proof.deliveredOnTime ? '1' : '0'} + 0.35·{proof.scopeMatchedAgreement ? '1' : '0'} +
@@ -214,28 +231,17 @@ function CompletionModal({
               </Text>
               <Text style={modal.fairnessValue}>{fairness.toFixed(2)}</Text>
             </View>
-
-            {/* Notes */}
             <Text style={modal.fieldLabel}>Notes (optional)</Text>
-            <TextInput
-              style={[modal.input, { height: 72, textAlignVertical: 'top' }]}
-              value={proof.notes}
-              onChangeText={t => setProof(p => ({ ...p, notes: t }))}
-              placeholder="Context, evidence links, etc."
-              placeholderTextColor="#607876"
-              multiline
-            />
-
-            {/* Actions */}
+            <TextInput style={[modal.input, { height: 72, textAlignVertical: 'top' }]}
+              value={proof.notes} onChangeText={t => setProof(p => ({ ...p, notes: t }))}
+              placeholder="Context, evidence links, etc." placeholderTextColor="#607876" multiline />
             <View style={modal.actions}>
               <Pressable style={modal.cancelBtn} onPress={onClose}>
                 <Text style={modal.cancelBtnText}>Cancel</Text>
               </Pressable>
               <Pressable
                 style={[modal.submitBtn, (!given.trim() || !received.trim()) && modal.submitBtnDisabled]}
-                onPress={handleSubmit}
-                disabled={!given.trim() || !received.trim()}
-              >
+                onPress={handleSubmit} disabled={!given.trim() || !received.trim()}>
                 <Text style={modal.submitBtnText}>Submit Completion →</Text>
               </Pressable>
             </View>
@@ -246,28 +252,18 @@ function CompletionModal({
   );
 }
 
-// ─── Match Card ────────────────────────────────────────────────────────────────
+// ─── MatchCard ────────────────────────────────────────────────────────────────
 
 function MatchCard({
-  user,
-  currentUser,
-  connections,
-  completed,
-  requests,
-  request,
-  connect,
-  onComplete,
+  user, currentUser, connections, completed, requests, request, connect, onComplete,
 }: {
-  user: MatchUser;
-  currentUser: MatchUser;
-  connections: Set<string>;
-  completed: Set<string>;
-  requests: Set<string>;
-  request: (id: string) => void;
-  connect: (id: string) => void;
+  user: MatchUser; currentUser: MatchUser;
+  connections: Set<string>; completed: Set<string>; requests: Set<string>;
+  request: (id: string) => void; connect: (id: string) => void;
   onComplete: (partner: MatchUser) => void;
 }) {
-  const [showMath, setShowMath] = useState(false);
+  const [showMath,  setShowMath]  = useState(false);
+  const [showTrust, setShowTrust] = useState(false);
   const scores = useMemo(() => matchScore(currentUser, user), [user, currentUser]);
 
   const isConnected = connections.has(user.id);
@@ -276,17 +272,16 @@ function MatchCard({
 
   const youCoverTheirNeeds = currentUser.offers.filter(s => user.requests.includes(s));
   const theyCoverYourNeeds = user.offers.filter(s => currentUser.requests.includes(s));
+  const badgeColor = scores.total >= 0.7 ? '#61d8cc' : scores.total >= 0.45 ? '#FFD166' : '#EF767A';
 
-  const badgeColor =
-    scores.total >= 0.7 ? '#61d8cc' : scores.total >= 0.45 ? '#FFD166' : '#EF767A';
-
-  function toggleMath() {
+  function toggle(setter: React.Dispatch<React.SetStateAction<boolean>>) {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setShowMath(v => !v);
+    setter(v => !v);
   }
 
   return (
     <View style={styles.card}>
+      {/* Header */}
       <View style={styles.cardHeader}>
         <View style={styles.avatarBox}>
           <Text style={styles.avatarEmoji}>{user.avatar}</Text>
@@ -304,6 +299,7 @@ function MatchCard({
         </View>
       </View>
 
+      {/* Skill overlap chips */}
       {theyCoverYourNeeds.length > 0 && (
         <View style={styles.highlightRow}>
           <Text style={styles.highlightLabel}>✓ They cover your need: </Text>
@@ -324,31 +320,38 @@ function MatchCard({
         <Text style={styles.noOverlap}>— No direct skill overlap</Text>
       )}
 
+      {/* Why This Match — plain English */}
+      <WhyCard you={currentUser} other={user} scores={scores} />
+
+      {/* Score bars — trust bar label is tappable to expand T(u) */}
       <View style={styles.barsSection}>
         <View style={styles.barRow}>
           <Text style={styles.barLabel}>SkillFit</Text>
           <ScoreBar value={scores.sf} color="#61d8cc" />
           <Text style={styles.barValue}>{scores.sf.toFixed(2)}</Text>
         </View>
-        <View style={styles.barRow}>
-          <Text style={styles.barLabel}>Trust   </Text>
+        <Pressable onPress={() => toggle(setShowTrust)} style={styles.barRow}>
+          <Text style={[styles.barLabel, styles.barLabelTappable]}>Trust ▾</Text>
           <ScoreBar value={scores.tc} color="#4f98a3" />
           <Text style={styles.barValue}>{scores.tc.toFixed(2)}</Text>
-        </View>
+        </Pressable>
+        {showTrust && <TrustBreakdown user={user} />}
         <View style={styles.barRow}>
-          <Text style={styles.barLabel}>Match   </Text>
+          <Text style={styles.barLabel}>Match  </Text>
           <ScoreBar value={scores.total} color={badgeColor} />
           <Text style={styles.barValue}>{scores.total.toFixed(2)}</Text>
         </View>
       </View>
 
-      <Pressable onPress={toggleMath} style={styles.mathToggle}>
+      {/* Math toggle */}
+      <Pressable onPress={() => toggle(setShowMath)} style={styles.mathToggle}>
         <Text style={styles.mathToggleText}>
-          {showMath ? '▲ Hide Math' : '▼ Show Math  M(you, ' + user.name + ')'}
+          {showMath ? '▲ Hide Math' : `▼ Show Math  M(you, ${user.name})`}
         </Text>
       </Pressable>
       {showMath && <MathPanel scores={scores} user={user} />}
 
+      {/* Action buttons */}
       <View style={styles.actionRow}>
         {isDone ? (
           <View style={[styles.actionBtn, styles.doneBtn]}>
@@ -359,10 +362,8 @@ function MatchCard({
             <View style={[styles.actionBtn, styles.connectedBtn, { flex: 1 }]}>
               <Text style={styles.actionBtnText}>✓ Connected</Text>
             </View>
-            <Pressable
-              style={[styles.actionBtn, styles.completeBtn, { flex: 1 }]}
-              onPress={() => onComplete(user)}
-            >
+            <Pressable style={[styles.actionBtn, styles.completeBtn, { flex: 1 }]}
+              onPress={() => onComplete(user)}>
               <Text style={styles.actionBtnText}>Complete Swap ✦</Text>
             </Pressable>
           </View>
@@ -380,7 +381,7 @@ function MatchCard({
   );
 }
 
-// ─── Main Screen ───────────────────────────────────────────────────────────────
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function MatchHub() {
   const { data: authUser } = useUser();
@@ -398,10 +399,7 @@ export default function MatchHub() {
 
   const pending = MOCK_USERS.length - connections.size - requests.size - completed.size;
 
-  const handleComplete = useCallback((partner: MatchUser) => {
-    setCompletionTarget(partner);
-  }, []);
-
+  const handleComplete   = useCallback((partner: MatchUser) => setCompletionTarget(partner), []);
   const handleSubmitCompletion = useCallback(
     (given: string, received: string, proof: ProofField) => {
       if (!completionTarget) return;
@@ -419,9 +417,7 @@ export default function MatchHub() {
         <View>
           <Text style={styles.headerEyebrow}>SKILLSWAP</Text>
           <Text style={styles.headerTitle}>Skill Matches</Text>
-          {authUser && (
-            <Text style={styles.headerSub}>Signed in as {authUser.name}</Text>
-          )}
+          {authUser && <Text style={styles.headerSub}>Signed in as {authUser.name}</Text>}
         </View>
         <View style={{ alignItems: 'flex-end', gap: 8 }}>
           <View style={styles.statsRow}>
@@ -440,10 +436,7 @@ export default function MatchHub() {
               <Text style={styles.statLabel}>Pending</Text>
             </View>
           </View>
-          <Pressable
-            style={styles.historyBtn}
-            onPress={() => router.push('/transaction/history')}
-          >
+          <Pressable style={styles.historyBtn} onPress={() => router.push('/transaction/history')}>
             <Text style={styles.historyBtnText}>History ({completed.size}) ›</Text>
           </Pressable>
         </View>
@@ -466,14 +459,9 @@ export default function MatchHub() {
         keyExtractor={u => u.id}
         renderItem={({ item }) => (
           <MatchCard
-            user={item}
-            currentUser={YOU}
-            connections={connections}
-            completed={completed}
-            requests={requests}
-            request={request}
-            connect={connect}
-            onComplete={handleComplete}
+            user={item} currentUser={YOU}
+            connections={connections} completed={completed} requests={requests}
+            request={request} connect={connect} onComplete={handleComplete}
           />
         )}
         contentContainerStyle={styles.list}
@@ -481,10 +469,8 @@ export default function MatchHub() {
       />
 
       <CompletionModal
-        visible={completionTarget !== null}
-        partner={completionTarget}
-        currentUser={YOU}
-        onClose={() => setCompletionTarget(null)}
+        visible={completionTarget !== null} partner={completionTarget}
+        currentUser={YOU} onClose={() => setCompletionTarget(null)}
         onSubmit={handleSubmitCompletion}
       />
     </SafeAreaView>
@@ -495,223 +481,151 @@ export default function MatchHub() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#d6d8d3' },
   header: {
-    backgroundColor: '#ececea',
-    borderBottomWidth: 2,
-    borderBottomColor: '#2f3333',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    backgroundColor: '#ececea', borderBottomWidth: 2, borderBottomColor: '#2f3333',
+    paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
   },
   headerEyebrow: { fontSize: 11, fontWeight: '700', color: '#434948', letterSpacing: 1.4 },
-  headerTitle: { fontSize: 24, fontWeight: '800', color: '#101414' },
-  headerSub: { fontSize: 12, color: '#394140', marginTop: 2 },
-  statsRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  statBox: { alignItems: 'center', minWidth: 52 },
-  statNum: { fontSize: 22, fontWeight: '800' },
-  statLabel: { fontSize: 10, color: '#434948', fontWeight: '600', letterSpacing: 0.4 },
-  statDivider: { width: 1, height: 28, backgroundColor: '#2f3333', marginHorizontal: 6 },
+  headerTitle:   { fontSize: 24, fontWeight: '800', color: '#101414' },
+  headerSub:     { fontSize: 12, color: '#394140', marginTop: 2 },
+  statsRow:      { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  statBox:       { alignItems: 'center', minWidth: 52 },
+  statNum:       { fontSize: 22, fontWeight: '800' },
+  statLabel:     { fontSize: 10, color: '#434948', fontWeight: '600', letterSpacing: 0.4 },
+  statDivider:   { width: 1, height: 28, backgroundColor: '#2f3333', marginHorizontal: 6 },
   historyBtn: {
-    backgroundColor: '#2f3333',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 3,
+    backgroundColor: '#2f3333', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 3,
   },
   historyBtnText: { fontSize: 12, fontWeight: '800', color: '#61d8cc' },
   yourProfile: {
-    backgroundColor: '#f3f4f1',
-    borderBottomWidth: 2,
-    borderBottomColor: '#2f3333',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    backgroundColor: '#f3f4f1', borderBottomWidth: 2, borderBottomColor: '#2f3333',
+    paddingHorizontal: 16, paddingVertical: 10,
   },
-  yourProfileTitle: {
-    fontSize: 11, fontWeight: '700', color: '#434948', letterSpacing: 1.2, marginBottom: 6,
-  },
+  yourProfileTitle: { fontSize: 11, fontWeight: '700', color: '#434948', letterSpacing: 1.2, marginBottom: 6 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
   chipGroupLabel: { fontSize: 11, fontWeight: '700', color: '#2f3333', width: 44 },
   chip: { borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3 },
   chipText: { fontSize: 12, fontWeight: '700' },
   list: { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 32, gap: 14 },
   card: {
-    backgroundColor: '#f3f4f1',
-    borderWidth: 2,
-    borderColor: '#2f3333',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
+    backgroundColor: '#f3f4f1', borderWidth: 2, borderColor: '#2f3333',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15, shadowRadius: 8, elevation: 4,
   },
   cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#d0d2ce',
+    flexDirection: 'row', alignItems: 'center', padding: 12,
+    borderBottomWidth: 1, borderBottomColor: '#d0d2ce',
   },
   avatarBox: {
     width: 44, height: 44, backgroundColor: '#61d8cc',
     borderWidth: 2, borderColor: '#1f4642',
     alignItems: 'center', justifyContent: 'center',
   },
-  avatarEmoji: { fontSize: 22 },
-  cardName: { fontSize: 17, fontWeight: '800', color: '#101414' },
-  cardOffersLine: { fontSize: 12, color: '#394140', marginTop: 1 },
+  avatarEmoji:     { fontSize: 22 },
+  cardName:        { fontSize: 17, fontWeight: '800', color: '#101414' },
+  cardOffersLine:  { fontSize: 12, color: '#394140', marginTop: 1 },
   scoreBadge: {
-    borderWidth: 2, borderRadius: 4,
-    paddingHorizontal: 8, paddingVertical: 4,
+    borderWidth: 2, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 4,
     alignItems: 'center', justifyContent: 'center', minWidth: 50,
   },
-  scoreBadgeText: { fontSize: 16, fontWeight: '900' },
+  scoreBadgeText:  { fontSize: 16, fontWeight: '900' },
   highlightRow: {
     flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center',
     paddingHorizontal: 12, paddingTop: 8, gap: 4,
   },
-  highlightLabel: { fontSize: 12, fontWeight: '700', color: '#2a8780' },
-  noOverlap: { fontSize: 12, color: '#888', paddingHorizontal: 12, paddingTop: 8, fontStyle: 'italic' },
+  highlightLabel:  { fontSize: 12, fontWeight: '700', color: '#2a8780' },
+  noOverlap:       { fontSize: 12, color: '#888', paddingHorizontal: 12, paddingTop: 8, fontStyle: 'italic' },
+
+  // Why This Match
+  whyCard: {
+    backgroundColor: '#e8ebe5', borderTopWidth: 1, borderTopColor: '#d0d2ce',
+    paddingHorizontal: 12, paddingVertical: 8, marginTop: 4,
+  },
+  whyLabel: { fontSize: 9, fontWeight: '800', color: '#607876', letterSpacing: 1.3, marginBottom: 3 },
+  whyText:  { fontSize: 13, color: '#2f3333', lineHeight: 19 },
+
+  // Bars
   barsSection: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 6, gap: 6 },
-  barRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  barLabel: {
-    fontSize: 11, fontWeight: '700', color: '#2f3333', width: 56,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-  },
+  barRow:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  barLabel: { fontSize: 11, fontWeight: '700', color: '#2f3333', width: 60, fontFamily: MONO },
+  barLabelTappable: { color: '#1f4642', textDecorationLine: 'underline' },
   barTrack: { flex: 1, height: 8, backgroundColor: '#d0d2ce', borderRadius: 2, overflow: 'hidden' },
-  barFill: { height: '100%', borderRadius: 2 },
-  barValue: {
-    fontSize: 11, fontWeight: '700', color: '#2f3333', width: 32, textAlign: 'right',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  barFill:  { height: '100%', borderRadius: 2 },
+  barValue: { fontSize: 11, fontWeight: '700', color: '#2f3333', width: 32, textAlign: 'right', fontFamily: MONO },
+
+  // Trust breakdown
+  trustBreakdown: {
+    backgroundColor: '#1c2424', paddingHorizontal: 12, paddingVertical: 10,
+    marginTop: 2, gap: 5,
   },
+  trustBreakdownTitle: { fontSize: 11, color: '#4f98a3', fontFamily: MONO, marginBottom: 4 },
+  trustBreakdownRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  trustBreakdownSym:    { fontSize: 12, fontWeight: '800', color: '#61d8cc', width: 20, fontFamily: MONO },
+  trustBreakdownLabel:  { fontSize: 11, color: '#a8c5c2', width: 88 },
+  trustBreakdownVal:    { fontSize: 11, color: '#61d8cc', fontWeight: '700', width: 32, textAlign: 'right', fontFamily: MONO },
+  trustBreakdownWeight: { fontSize: 10, color: '#607876', width: 28, fontFamily: MONO },
+
   mathToggle: {
     borderTopWidth: 1, borderTopColor: '#d0d2ce',
-    paddingVertical: 8, paddingHorizontal: 12,
-    backgroundColor: '#e8ebe5',
+    paddingVertical: 8, paddingHorizontal: 12, backgroundColor: '#e8ebe5',
   },
   mathToggleText: { fontSize: 12, fontWeight: '700', color: '#1f4642', letterSpacing: 0.3 },
-  mathPanel: {
-    backgroundColor: '#1c2424', borderTopWidth: 1, borderTopColor: '#2f3333', padding: 12, gap: 3,
-  },
-  mathTitle: { fontSize: 12, fontWeight: '800', color: '#61d8cc', letterSpacing: 0.5, marginBottom: 4 },
-  mathFormula: {
-    fontSize: 13, color: '#fff',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontWeight: '700',
-  },
+  mathPanel: { backgroundColor: '#1c2424', borderTopWidth: 1, borderTopColor: '#2f3333', padding: 12, gap: 3 },
+  mathTitle:   { fontSize: 12, fontWeight: '800', color: '#61d8cc', letterSpacing: 0.5, marginBottom: 4 },
+  mathFormula: { fontSize: 13, color: '#fff', fontFamily: MONO, fontWeight: '700' },
   mathDivider: { height: 1, backgroundColor: '#2f4a47', marginVertical: 4 },
-  mathLine: {
-    fontSize: 12, color: '#a8c5c2',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-  },
-  mathVal: { color: '#61d8cc', fontWeight: '800' },
-  mathSub: {
-    fontSize: 10, color: '#607876',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    marginLeft: 8, marginBottom: 2,
-  },
-  mathTotal: {
-    fontSize: 12, color: '#fff',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontWeight: '700',
-  },
+  mathLine:    { fontSize: 12, color: '#a8c5c2', fontFamily: MONO },
+  mathVal:     { color: '#61d8cc', fontWeight: '800' },
+  mathSub:     { fontSize: 10, color: '#607876', fontFamily: MONO, marginLeft: 8, marginBottom: 2 },
+  mathTotal:   { fontSize: 12, color: '#fff', fontFamily: MONO, fontWeight: '700' },
   mathTotalValue: { color: '#61d8cc', fontWeight: '900' },
-  mathNote: {
-    fontSize: 11, color: '#607876',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginTop: 2,
-  },
+  mathNote:    { fontSize: 11, color: '#607876', fontFamily: MONO, marginTop: 2 },
+
   actionRow: { borderTopWidth: 1, borderTopColor: '#d0d2ce', padding: 10 },
   actionBtn: { paddingVertical: 11, alignItems: 'center', borderWidth: 2, flex: 1 },
   actionBtnText: { fontSize: 15, fontWeight: '800', color: '#000' },
-  requestBtn: { backgroundColor: '#61d8cc', borderColor: '#1f4642' },
-  acceptBtn: { backgroundColor: '#FF8C42', borderColor: '#7a3a10' },
+  requestBtn:   { backgroundColor: '#61d8cc', borderColor: '#1f4642' },
+  acceptBtn:    { backgroundColor: '#FF8C42', borderColor: '#7a3a10' },
   connectedBtn: { backgroundColor: '#d0f0ec', borderColor: '#2a8780' },
-  completeBtn: { backgroundColor: '#FFD166', borderColor: '#8a6800' },
-  doneBtn: { backgroundColor: '#e8ebe5', borderColor: '#999' },
+  completeBtn:  { backgroundColor: '#FFD166', borderColor: '#8a6800' },
+  doneBtn:      { backgroundColor: '#e8ebe5', borderColor: '#999' },
 });
 
 const modal = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'flex-end',
-  },
+  overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: '#1c2424',
-    borderTopWidth: 2,
-    borderTopColor: '#61d8cc',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 20,
-    maxHeight: '90%',
+    backgroundColor: '#1c2424', borderTopWidth: 2, borderTopColor: '#61d8cc',
+    borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, maxHeight: '90%',
   },
-  handle: {
-    width: 40, height: 4,
-    backgroundColor: '#607876',
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 16,
-  },
-  title: { fontSize: 18, fontWeight: '900', color: '#61d8cc', marginBottom: 4 },
+  handle: { width: 40, height: 4, backgroundColor: '#607876', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  title:    { fontSize: 18, fontWeight: '900', color: '#61d8cc', marginBottom: 4 },
   subtitle: { fontSize: 12, color: '#607876', marginBottom: 16, lineHeight: 18 },
   fieldLabel: { fontSize: 11, fontWeight: '700', color: '#a8c5c2', letterSpacing: 0.8, marginBottom: 6 },
   input: {
-    backgroundColor: '#131b1b',
-    borderWidth: 1,
-    borderColor: '#2f4a47',
-    color: '#fff',
-    padding: 10,
-    fontSize: 14,
-    marginBottom: 14,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    backgroundColor: '#131b1b', borderWidth: 1, borderColor: '#2f4a47',
+    color: '#fff', padding: 10, fontSize: 14, marginBottom: 14, fontFamily: MONO,
   },
   checkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    marginBottom: 6,
-    borderWidth: 1,
-    borderColor: '#2f4a47',
-    backgroundColor: '#131b1b',
-    gap: 10,
+    flexDirection: 'row', alignItems: 'center', padding: 12, marginBottom: 6,
+    borderWidth: 1, borderColor: '#2f4a47', backgroundColor: '#131b1b', gap: 10,
   },
   checkRowActive: { borderColor: '#61d8cc', backgroundColor: '#1f3530' },
-  checkbox: {
-    width: 22, height: 22,
-    borderWidth: 2, borderColor: '#607876',
-    alignItems: 'center', justifyContent: 'center',
-  },
+  checkbox: { width: 22, height: 22, borderWidth: 2, borderColor: '#607876', alignItems: 'center', justifyContent: 'center' },
   checkboxChecked: { borderColor: '#61d8cc', backgroundColor: '#61d8cc' },
-  checkmark: { fontSize: 13, fontWeight: '900', color: '#000' },
-  checkLabel: { flex: 1, fontSize: 14, color: '#ccc' },
-  checkWeight: {
-    fontSize: 11, color: '#607876',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-  },
+  checkmark:   { fontSize: 13, fontWeight: '900', color: '#000' },
+  checkLabel:  { flex: 1, fontSize: 14, color: '#ccc' },
+  checkWeight: { fontSize: 11, color: '#607876', fontFamily: MONO },
   fairnessRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#131b1b',
-    borderWidth: 1,
-    borderColor: '#2f4a47',
-    padding: 10,
-    marginVertical: 12,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: '#131b1b', borderWidth: 1, borderColor: '#2f4a47',
+    padding: 10, marginVertical: 12,
   },
-  fairnessLabel: {
-    fontSize: 11, color: '#607876',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    flex: 1,
-  },
+  fairnessLabel: { fontSize: 11, color: '#607876', fontFamily: MONO, flex: 1 },
   fairnessValue: { fontSize: 20, fontWeight: '900', color: '#61d8cc' },
-  actions: { flexDirection: 'row', gap: 10, marginTop: 8, marginBottom: 20 },
-  cancelBtn: {
-    flex: 1, padding: 14, borderWidth: 2, borderColor: '#2f4a47',
-    alignItems: 'center',
-  },
+  actions:       { flexDirection: 'row', gap: 10, marginTop: 8, marginBottom: 20 },
+  cancelBtn:     { flex: 1, padding: 14, borderWidth: 2, borderColor: '#2f4a47', alignItems: 'center' },
   cancelBtnText: { fontSize: 14, fontWeight: '700', color: '#607876' },
-  submitBtn: {
-    flex: 2, padding: 14, backgroundColor: '#61d8cc',
-    borderWidth: 2, borderColor: '#1f4642', alignItems: 'center',
-  },
+  submitBtn:     { flex: 2, padding: 14, backgroundColor: '#61d8cc', borderWidth: 2, borderColor: '#1f4642', alignItems: 'center' },
   submitBtnDisabled: { backgroundColor: '#2f4a47', borderColor: '#2f4a47' },
   submitBtnText: { fontSize: 14, fontWeight: '900', color: '#000' },
 });

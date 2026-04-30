@@ -2,19 +2,17 @@
  * Seed users for SkillSwap matching demo.
  * Based on interview subjects from the COGS 128 research data.
  *
- * Each user has:
- *   O(u) = offers   (skills they can provide)
- *   R(u) = requests (skills they want to receive)
- *   + trust score components: portfolio, rating, verified, consistency, communication
+ * Three users (Alex, Maria, Daniel) have pre-seeded completed swaps so the
+ * History screen is never empty on first load — the three proof scenarios show
+ * the full fairness spectrum: perfect (F=1.0), late delivery (F=0.50),
+ * and strong-but-no-evidence (F=0.85).
+ *
+ * The remaining three (Jasmine, Kevin, Lina) are available to interact with live.
  */
 
 import type { MatchUser } from './matching';
+import { completeSwap } from './matching';
 
-/**
- * YOU — the currently logged-in user's profile.
- * In a real app this would come from the auth/profile API.
- * Skills chosen to create meaningful overlaps with seed users below.
- */
 export const YOU: MatchUser = {
   id: 'you',
   name: 'You',
@@ -28,10 +26,6 @@ export const YOU: MatchUser = {
   communication: 0.90,
 };
 
-/**
- * Seed pool — 6 users drawn from PDF interview subjects.
- * Skills are normalized strings so intersection math works correctly.
- */
 export const MOCK_USERS: MatchUser[] = [
   {
     id: 'alex',
@@ -44,9 +38,6 @@ export const MOCK_USERS: MatchUser[] = [
     verified:      2,
     consistency:   0.80,
     communication: 0.90,
-    // SF(you, Alex): you offer Web Dev → Alex needs Web Dev  ✓ (1/2 of their needs)
-    //                Alex offers Graphic Design → you need it  ✓ (1/2 of your needs)
-    // High SkillFit expected
   },
   {
     id: 'maria',
@@ -59,8 +50,6 @@ export const MOCK_USERS: MatchUser[] = [
     verified:      2,
     consistency:   0.95,
     communication: 0.85,
-    // SF: Maria offers Photography (you need it) + you offer Linux Admin (Maria needs it)
-    // Very high SkillFit AND high Trust → top match
   },
   {
     id: 'daniel',
@@ -73,8 +62,6 @@ export const MOCK_USERS: MatchUser[] = [
     verified:      1,
     consistency:   0.70,
     communication: 0.75,
-    // SF: you offer Web Dev (Daniel needs it) but Daniel offers nothing you need
-    // Medium SkillFit (one-sided), lower trust score
   },
   {
     id: 'jasmine',
@@ -87,8 +74,6 @@ export const MOCK_USERS: MatchUser[] = [
     verified:      1,
     consistency:   0.90,
     communication: 0.95,
-    // SF: you offer Web Dev (Jasmine needs it) but Jasmine offers nothing you need
-    // Good trust but weaker fit (no overlap on your requests)
   },
   {
     id: 'kevin',
@@ -101,8 +86,6 @@ export const MOCK_USERS: MatchUser[] = [
     verified:      1,
     consistency:   0.65,
     communication: 0.70,
-    // SF: no overlap with your offers or requests
-    // Low SkillFit AND lower trust → bottom of ranking
   },
   {
     id: 'lina',
@@ -115,7 +98,54 @@ export const MOCK_USERS: MatchUser[] = [
     verified:      2,
     consistency:   0.88,
     communication: 0.92,
-    // SF: you offer Linux Admin (Lina needs it) but Lina offers nothing you need
-    // Good trust, partial fit (one-sided)
   },
 ];
+
+// ─── Demo history seed ────────────────────────────────────────────────────────
+// Pre-populate 3 completed swaps so History shows real data immediately.
+// Scenarios are chosen to demonstrate the full fairness spectrum:
+//
+//   Alex  — perfect swap (F=1.0):  on time, scope matched, evidence, would swap again
+//   Maria — great swap (F=0.85):   on time, scope matched, would swap again (no evidence uploaded)
+//   Daniel — late delivery (F=0.50): scope matched + would swap again, but late & no evidence
+
+const [alex, maria, daniel] = MOCK_USERS;
+
+completeSwap(
+  alex, YOU,
+  'Web Dev', 'Graphic Design',
+  {
+    deliveredOnTime:          true,
+    scopeMatchedAgreement:    true,
+    portfolioEvidenceAttached: true,
+    wouldSwapAgain:           true,
+    notes: 'Alex redesigned the landing page — clean work, delivered in 3 days.',
+  },
+  '2026-04-20T14:00:00.000Z',
+);
+
+completeSwap(
+  maria, YOU,
+  'Linux Admin', 'Photography',
+  {
+    deliveredOnTime:          true,
+    scopeMatchedAgreement:    true,
+    portfolioEvidenceAttached: false,
+    wouldSwapAgain:           true,
+    notes: 'Maria shot 40 edited photos. No portfolio link yet — she said she would upload later.',
+  },
+  '2026-04-15T10:30:00.000Z',
+);
+
+completeSwap(
+  daniel, YOU,
+  'Web Dev', 'Bookkeeping',
+  {
+    deliveredOnTime:          false,
+    scopeMatchedAgreement:    true,
+    portfolioEvidenceAttached: false,
+    wouldSwapAgain:           true,
+    notes: 'Bookkeeping was solid but Daniel ran 5 days late. Would swap again for the right project.',
+  },
+  '2026-04-10T09:00:00.000Z',
+);
