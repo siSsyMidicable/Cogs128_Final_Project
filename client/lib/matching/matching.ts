@@ -6,6 +6,9 @@
  *   SF(u,v) = SkillFit — how well offered/needed skills overlap
  *   TC(u,v) = Trust Compatibility — geometric mean of both trust scores
  *   M(u,v)  = 0.34·SF + 0.33·TC + 0.33·F  (overall match score)
+ *
+ *   F for completed swaps is computed from verifiable proof fields,
+ *   not a raw star rating that can be gamed.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -29,9 +32,62 @@ export type MatchScoreBreakdown = {
   total: number;  // M(u,v)
   sf: number;     // SkillFit(u,v)
   tc: number;     // TrustCompat(u,v)
-  fair: number;   // F(u,v) — fairness (1.0 for new connections)
+  fair: number;   // F(u,v)
   tu: number;     // T(you)
   tv: number;     // T(other)
+};
+
+/**
+ * ProofField — the 4 verifiable transparency checkboxes.
+ * These replace a star rating.  Each field is a claim that can be
+ * cross-checked against chat logs, portfolio links, or delivery dates.
+ *
+ * Fairness is computed as a weighted sum so no single field dominates:
+ *   F = 0.35·deliveredOnTime + 0.35·scopeMatchedAgreement
+ *     + 0.15·portfolioEvidenceAttached + 0.15·wouldSwapAgain
+ */
+export type ProofField = {
+  deliveredOnTime: boolean;
+  scopeMatchedAgreement: boolean;
+  portfolioEvidenceAttached: boolean;
+  wouldSwapAgain: boolean;
+  notes?: string;
+};
+
+export function fairnessFromProof(proof: ProofField): number {
+  let f = 0;
+  if (proof.deliveredOnTime)          f += 0.35;
+  if (proof.scopeMatchedAgreement)    f += 0.35;
+  if (proof.portfolioEvidenceAttached) f += 0.15;
+  if (proof.wouldSwapAgain)           f += 0.15;
+  return f;
+}
+
+/**
+ * TrustImpact — human-readable tags derived from proof fields.
+ * Surfaces what improved (or didn't) in the trust model.
+ */
+export function trustImpactTags(proof: ProofField): string[] {
+  const tags: string[] = [];
+  if (proof.deliveredOnTime && proof.scopeMatchedAgreement) tags.push('+consistency');
+  if (proof.wouldSwapAgain) tags.push('+review signal');
+  if (proof.portfolioEvidenceAttached) tags.push('+portfolio evidence');
+  if (!proof.deliveredOnTime) tags.push('⚠ late delivery');
+  if (!proof.scopeMatchedAgreement) tags.push('⚠ scope drift');
+  return tags;
+}
+
+export type HistoryRecord = {
+  id: string;                    // unique record id
+  partnerId: string;
+  partnerName: string;
+  partnerAvatar: string;
+  skillGiven: string;            // what you gave
+  skillReceived: string;         // what you received
+  completedAt: string;           // ISO date string
+  proof: ProofField;
+  fairness: number;              // computed from proof
+  scores: MatchScoreBreakdown;   // the M(u,v) breakdown at time of match
 };
 
 // ─── Core Math Functions ───────────────────────────────────────────────────────
@@ -78,12 +134,18 @@ export function trustCompat(u: MatchUser, v: MatchUser): number {
 /**
  * M(u,v) = γ_F·F + γ_T·TC + γ_S·SF
  * γ_S=0.34, γ_T=0.33, γ_F=0.33  (skill fit weighted slightly higher)
- * F = 1.0 for new connections (no task history yet)
+ *
+ * When called for a live match candidate, F defaults to 1.0 (no history yet).
+ * When called for a completed swap, pass the proof-derived fairness value.
  */
-export function matchScore(u: MatchUser, v: MatchUser): MatchScoreBreakdown {
+export function matchScore(
+  u: MatchUser,
+  v: MatchUser,
+  fairOverride?: number,
+): MatchScoreBreakdown {
   const sf   = skillFit(u, v);
   const tc   = trustCompat(u, v);
-  const fair = 1.0;
+  const fair = fairOverride !== undefined ? fairOverride : 1.0;
   const tu   = trustScore(u);
   const tv   = trustScore(v);
   return {
@@ -97,10 +159,12 @@ export function matchScore(u: MatchUser, v: MatchUser): MatchScoreBreakdown {
 }
 
 // ─── Module-Level State (same pattern as auth) ────────────────────────────────
-// Keeps connection/request state across screens without a full state manager.
+// Keeps connection/request/history state across screens without a full store.
 
 let _connections = new Set<string>();
 let _requests    = new Set<string>();
+let _completed   = new Set<string>();          // ids that have been completed
+let _history: HistoryRecord[] = [];
 const _listeners = new Set<() => void>();
 
 function _notify() {
@@ -120,14 +184,48 @@ export function confirmConnect(userId: string) {
   _notify();
 }
 
+/**
+ * completeSwap — called from the completion modal.
+ * Creates a HistoryRecord with proof-derived fairness and removes the
+ * connection from the active "connected" set (swap is done).
+ */
+export function completeSwap(
+  partner: MatchUser,
+  currentUser: MatchUser,
+  skillGiven: string,
+  skillReceived: string,
+  proof: ProofField,
+): void {
+  const fair = fairnessFromProof(proof);
+  const scores = matchScore(currentUser, partner, fair);
+  const record: HistoryRecord = {
+    id: `${partner.id}-${Date.now()}`,
+    partnerId: partner.id,
+    partnerName: partner.name,
+    partnerAvatar: partner.avatar,
+    skillGiven,
+    skillReceived,
+    completedAt: new Date().toISOString(),
+    proof,
+    fairness: fair,
+    scores,
+  };
+  _history = [record, ..._history];
+  _completed.add(partner.id);
+  _connections.delete(partner.id);
+  _notify();
+}
+
 export function getMatchingState() {
   return {
     connections: new Set(_connections),
     requests:    new Set(_requests),
+    completed:   new Set(_completed),
+    history:     [..._history],
   };
 }
 
-/** React hook — subscribes to live connection/request state. */
+/** React hook — subscribes to live connection/request/history state. */
 export function useMatchingState() {
   const [state, setState] = useState(getMatchingState);
 
@@ -137,8 +235,26 @@ export function useMatchingState() {
     return () => { _listeners.delete(update); };
   }, []);
 
-  const request = useCallback((id: string) => sendRequest(id), []);
-  const connect = useCallback((id: string) => confirmConnect(id), []);
+  const request  = useCallback((id: string) => sendRequest(id), []);
+  const connect  = useCallback((id: string) => confirmConnect(id), []);
+  const complete = useCallback(
+    (partner: MatchUser, cu: MatchUser, given: string, received: string, proof: ProofField) =>
+      completeSwap(partner, cu, given, received, proof),
+    [],
+  );
 
-  return { ...state, request, connect };
+  return { ...state, request, connect, complete };
+}
+
+/** Hook for the history screen — only cares about history records. */
+export function useHistoryState() {
+  const [history, setHistory] = useState<HistoryRecord[]>(() => [..._history]);
+
+  useEffect(() => {
+    const update = () => setHistory([..._history]);
+    _listeners.add(update);
+    return () => { _listeners.delete(update); };
+  }, []);
+
+  return history;
 }
