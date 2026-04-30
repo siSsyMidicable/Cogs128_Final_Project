@@ -1,39 +1,93 @@
 import { router } from "expo-router";
-import React from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
+  Dimensions,
+  FlatList,
   Pressable,
   SafeAreaView,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   View,
-  StyleProp,
-  ViewStyle,
+  ViewToken,
 } from "react-native";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const CARD_WIDTH = Math.min(SCREEN_WIDTH - 56, 340);
+const CARD_SIDE_PADDING = (SCREEN_WIDTH - CARD_WIDTH) / 2;
+
+const CARDS = [
+  {
+    id: "1",
+    title: "What's Inside",
+    description: "Connect with others to exchange skills and knowledge",
+    tilt: "-1deg",
+  },
+  {
+    id: "2",
+    title: "Trust & Transparency",
+    description: "Built on honest matching algorithms",
+    tilt: "1deg",
+  },
+  {
+    id: "3",
+    title: "Discrete Mathematics",
+    description: "Ensures fair and verified skill matches",
+    tilt: "-0.8deg",
+  },
+];
 
 function IntroCard({
   title,
   description,
-  tiltStyle,
+  tilt,
 }: {
   title: string;
   description: string;
-  tiltStyle: StyleProp<ViewStyle>;
+  tilt: string;
 }) {
   return (
-    <View style={styles.cardPerspective}>
-      <View style={[styles.cardGlow, styles.cardGlowOne]} />
-      <View style={[styles.cardGlow, styles.cardGlowTwo]} />
-      <View style={[styles.infoCard, tiltStyle]}>
-        <Text style={styles.cardTitle}>{title}</Text>
-        <Text style={styles.cardDescription}>{description}</Text>
+    <View style={[styles.cardWrapper, { width: CARD_WIDTH }]}>
+      <View style={styles.cardPerspective}>
+        <View style={[styles.cardGlow, styles.cardGlowOne]} />
+        <View style={[styles.cardGlow, styles.cardGlowTwo]} />
+        <View style={[styles.infoCard, { transform: [{ rotate: tilt }] }]}>
+          <Text style={styles.cardTitle}>{title}</Text>
+          <Text style={styles.cardDescription}>{description}</Text>
+        </View>
       </View>
     </View>
   );
 }
 
+function DotIndicators({ count, activeIndex }: { count: number; activeIndex: number }) {
+  return (
+    <View style={styles.dotsRow}>
+      {Array.from({ length: count }).map((_, i) => (
+        <View
+          key={i}
+          style={[styles.dot, i === activeIndex ? styles.dotActive : styles.dotInactive]}
+        />
+      ))}
+    </View>
+  );
+}
+
 export default function IntroScreen() {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const flatListRef = useRef<FlatList>(null);
+
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      if (viewableItems.length > 0 && viewableItems[0].index !== null) {
+        setActiveIndex(viewableItems[0].index);
+      }
+    },
+    []
+  );
+
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
@@ -41,10 +95,8 @@ export default function IntroScreen() {
         <View style={styles.gradientBackground} />
         <View style={styles.gridOverlay} />
 
-        <ScrollView
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-        >
+        <View style={styles.content}>
+          {/* Hero */}
           <View style={styles.hero}>
             <View style={[styles.heroGlow, styles.heroGlowOuter]} />
             <View style={[styles.heroGlow, styles.heroGlowInner]} />
@@ -52,27 +104,43 @@ export default function IntroScreen() {
             <Text style={styles.subtitle}>Trade your skills, grow together</Text>
           </View>
 
-          <View style={styles.cardsContainer}>
-            <IntroCard
-              title="What's Inside"
-              description="Connect with others to exchange skills and knowledge"
-              tiltStyle={styles.cardTiltA}
+          {/* Carousel */}
+          <View style={styles.carouselSection}>
+            <FlatList
+              ref={flatListRef}
+              data={CARDS}
+              keyExtractor={(item) => item.id}
+              horizontal
+              pagingEnabled={false}
+              snapToInterval={CARD_WIDTH + 16}
+              snapToAlignment="center"
+              decelerationRate="fast"
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingHorizontal: CARD_SIDE_PADDING,
+                gap: 16,
+              }}
+              renderItem={({ item }) => (
+                <IntroCard
+                  title={item.title}
+                  description={item.description}
+                  tilt={item.tilt}
+                />
+              )}
+              onViewableItemsChanged={onViewableItemsChanged}
+              viewabilityConfig={viewabilityConfig}
             />
-            <IntroCard
-              title="Trust & Transparency"
-              description="Built on honest matching algorithms"
-              tiltStyle={styles.cardTiltB}
-            />
-            <IntroCard
-              title="Discrete Mathematics"
-              description="Ensures fair and verified skill matches"
-              tiltStyle={styles.cardTiltC}
-            />
+
+            <DotIndicators count={CARDS.length} activeIndex={activeIndex} />
           </View>
 
+          {/* Skip Button */}
           <Pressable
             onPress={() => router.replace("/auth/login")}
-            style={({ pressed }) => [styles.skipButtonContainer, pressed && styles.skipButtonPressed]}
+            style={({ pressed }) => [
+              styles.skipButtonContainer,
+              pressed && styles.skipButtonPressed,
+            ]}
           >
             <View style={[styles.skipGlow, styles.skipGlowA]} />
             <View style={[styles.skipGlow, styles.skipGlowB]} />
@@ -82,7 +150,7 @@ export default function IntroScreen() {
               <Text style={styles.skipArrow}>›</Text>
             </View>
           </Pressable>
-        </ScrollView>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -110,16 +178,16 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
   },
   content: {
-    flexGrow: 1,
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 28,
     paddingVertical: 28,
   },
   hero: {
     width: "100%",
     alignItems: "center",
-    marginBottom: 28,
+    marginBottom: 32,
+    paddingHorizontal: 28,
   },
   heroGlow: {
     position: "absolute",
@@ -148,10 +216,15 @@ const styles = StyleSheet.create({
     color: "rgba(0,0,0,0.8)",
     textAlign: "center",
   },
-  cardsContainer: {
+
+  // Carousel
+  carouselSection: {
     width: "100%",
-    maxWidth: 340,
-    gap: 16,
+    alignItems: "center",
+    marginBottom: 28,
+  },
+  cardWrapper: {
+    // width set dynamically
   },
   cardPerspective: {
     position: "relative",
@@ -185,15 +258,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.45)",
   },
-  cardTiltA: {
-    transform: [{ rotate: "-1deg" }],
-  },
-  cardTiltB: {
-    transform: [{ rotate: "1deg" }],
-  },
-  cardTiltC: {
-    transform: [{ rotate: "-0.8deg" }],
-  },
   cardTitle: {
     fontSize: 18,
     fontWeight: "700",
@@ -205,8 +269,31 @@ const styles = StyleSheet.create({
     color: "rgba(0,0,0,0.78)",
     lineHeight: 20,
   },
+
+  // Dots
+  dotsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dot: {
+    borderRadius: 99,
+  },
+  dotActive: {
+    width: 22,
+    height: 8,
+    backgroundColor: "#000",
+  },
+  dotInactive: {
+    width: 8,
+    height: 8,
+    backgroundColor: "rgba(0,0,0,0.25)",
+  },
+
+  // Skip button
   skipButtonContainer: {
-    marginTop: 28,
     width: "100%",
     maxWidth: 240,
     position: "relative",
