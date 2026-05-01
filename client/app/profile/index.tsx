@@ -1,5 +1,5 @@
 import React from "react";
-import { ScrollView, StyleSheet, View, Pressable } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "react-native-paper";
 import Svg, { Path, Circle } from 'react-native-svg';
 
@@ -10,6 +10,7 @@ import { Remarks } from "@/features/remark/components/remarks";
 import { MonthlyTransactionsChart } from "@/features/statistic/components/monthly-transactions-chart";
 import { TrendingServicesChart } from "@/features/statistic/components/trending-services-chart";
 import { useLogout, useUser } from "@/lib/auth/auth";
+import { TunnelQR } from "@/components/ui/TunnelQR";
 
 // ─── Inline icons for Profile screen ─────────────────────────────────────────
 
@@ -118,6 +119,9 @@ export const AuthProfile = () => {
           <Text style={styles.iconLabel}>Reviews</Text>
         </View>
       </View>
+
+      {/* Live tunnel QR — update with: ./scripts/update-tunnel.sh <url> */}
+      <TunnelQR />
 
       <Remarks />
 
