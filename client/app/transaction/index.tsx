@@ -8,6 +8,7 @@
  *   • "Why This Match?" — plain English auto-generated summary per card
  *   • Trust Score Breakdown — tap the Trust bar label to expand T(u) components
  *   • Complete Swap — bottom-sheet modal with proof checkboxes + live F preview
+ *   • Custom icon system wired in throughout (SwapIcon, HistoryIcon, etc.)
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -26,6 +27,7 @@ import {
   ScrollView,
   TextInput,
 } from 'react-native';
+import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
 import { router } from 'expo-router';
 import { useUser } from '@/lib/auth/auth';
 import {
@@ -44,6 +46,102 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 const MONO: any = Platform.OS === 'ios' ? 'Courier' : 'monospace';
+
+// ─── Inline Icon Components ───────────────────────────────────────────────────
+// Rendered inline so no extra import chain is needed for this screen.
+// All on 24px grid, 1.75px stroke, stroke-only unless `filled`.
+
+function SwapIcon({ size = 18, color = '#000' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M3 8h14M14 5l3 3-3 3" stroke={color} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M21 16H7M10 13l-3 3 3 3" stroke={color} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function HistoryIcon({ size = 16, color = '#61d8cc' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M12 3v18" stroke={color} strokeWidth={1.75} strokeLinecap="round" />
+      <Circle cx={8} cy={8} r={2} stroke={color} strokeWidth={1.75} />
+      <Path d="M10 8h2" stroke={color} strokeWidth={1.75} strokeLinecap="round" />
+      <Circle cx={16} cy={14} r={2} stroke={color} strokeWidth={1.75} />
+      <Path d="M12 14h2" stroke={color} strokeWidth={1.75} strokeLinecap="round" />
+      <Circle cx={12} cy={3} r={1} fill={color} />
+      <Circle cx={12} cy={21} r={1} fill={color} />
+    </Svg>
+  );
+}
+
+function FairnessMeterIcon({ size = 16, color = '#61d8cc' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M12 5v14" stroke={color} strokeWidth={1.75} strokeLinecap="round" />
+      <Path d="M5 9h14" stroke={color} strokeWidth={1.75} strokeLinecap="round" />
+      <Circle cx={5} cy={13} r={2.5} stroke={color} strokeWidth={1.75} />
+      <Path d="M5 11v-2" stroke={color} strokeWidth={1.75} strokeLinecap="round" />
+      <Circle cx={19} cy={11} r={1.75} stroke={color} strokeWidth={1.75} />
+      <Path d="M9 19h6" stroke={color} strokeWidth={1.75} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function SaveSkillIcon({ size = 16, color = '#394140', filled = false }: { size?: number; color?: string; filled?: boolean }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z"
+        stroke={color} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"
+        fill={filled ? color : 'none'}
+      />
+    </Svg>
+  );
+}
+
+function NegotiateIcon({ size = 18, color = '#000' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M3 6a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H7l-4 3V6z" stroke={color} strokeWidth={1.75} strokeLinejoin="round" />
+      <Path d="M14 9h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-2l-3 2.5V10" stroke={color} strokeWidth={1.75} strokeLinejoin="round" />
+      <Path d="M6 9h5M9 7.5l1.5 1.5L9 10.5" stroke={color} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function VerifiedIcon({ size = 13, color = '#4f98a3' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M12 2L22 12 12 22 2 12 12 2z" stroke={color} strokeWidth={1.75} strokeLinejoin="round" fill="none" />
+      <Path d="M8.5 12l2.5 2.5 4.5-4.5" stroke={color} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function TransparencyReviewIcon({ size = 15, color = '#a8c5c2' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M5 3h10l3 3v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" stroke={color} strokeWidth={1.75} strokeLinejoin="round" />
+      <Path d="M15 3v3h3" stroke={color} strokeWidth={1.75} strokeLinejoin="round" />
+      <Path d="M8 9h5" stroke={color} strokeWidth={1.75} strokeLinecap="round" />
+      <Path d="M8 12h7" stroke={color} strokeWidth={1.75} strokeLinecap="round" />
+      <Path d="M8 15l1 1 2-2" stroke={color} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function DisputeIcon({ size = 15, color = '#EF767A' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M6 2h9l3 3v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" stroke={color} strokeWidth={1.75} strokeLinejoin="round" />
+      <Path d="M15 2v3h3" stroke={color} strokeWidth={1.75} strokeLinejoin="round" />
+      <Path d="M9 10h6" stroke={color} strokeWidth={1.75} strokeLinecap="round" />
+      <Path d="M9 10l-1 3" stroke={color} strokeWidth={1.75} strokeLinecap="round" />
+      <Path d="M15 10l1 3" stroke={color} strokeWidth={1.75} strokeLinecap="round" />
+      <Circle cx={12} cy={15} r={1} fill={color} />
+    </Svg>
+  );
+}
 
 // ─── ScoreBar ─────────────────────────────────────────────────────────────────
 
@@ -110,7 +208,6 @@ function MathPanel({ scores, user }: { scores: MatchScoreBreakdown; user: MatchU
 }
 
 // ─── TrustBreakdown ───────────────────────────────────────────────────────────
-// Expanded view of T(u) into its 5 weighted components.
 
 function TrustBreakdown({ user }: { user: MatchUser }) {
   const comp = trustComponents(user);
@@ -140,7 +237,6 @@ function TrustBreakdown({ user }: { user: MatchUser }) {
 }
 
 // ─── WhyCard ──────────────────────────────────────────────────────────────────
-// Plain English explanation. Auto-generated — nothing hardcoded.
 
 function WhyCard({ you, other, scores }: { you: MatchUser; other: MatchUser; scores: MatchScoreBreakdown }) {
   const text = useMemo(() => whyThisMatch(you, other, scores), [you, other, scores]);
@@ -201,10 +297,17 @@ function CompletionModal({ visible, partner, currentUser, onClose, onSubmit }: C
       <View style={modal.overlay}>
         <View style={modal.sheet}>
           <View style={modal.handle} />
-          <Text style={modal.title}>Complete Swap with {partner.name}</Text>
+
+          {/* Modal header with SwapIcon */}
+          <View style={modal.titleRow}>
+            <SwapIcon size={20} color="#61d8cc" />
+            <Text style={modal.title}>Complete Swap with {partner.name}</Text>
+          </View>
+
           <Text style={modal.subtitle}>
             Fairness is computed from verifiable fields — not a star rating that can be gamed.
           </Text>
+
           <ScrollView showsVerticalScrollIndicator={false}>
             <Text style={modal.fieldLabel}>Skill you gave</Text>
             <TextInput style={modal.input} value={given} onChangeText={setGiven}
@@ -212,7 +315,16 @@ function CompletionModal({ visible, partner, currentUser, onClose, onSubmit }: C
             <Text style={modal.fieldLabel}>Skill you received</Text>
             <TextInput style={modal.input} value={received} onChangeText={setReceived}
               placeholder={partner.offers[0] ?? 'e.g. Graphic Design'} placeholderTextColor="#607876" />
-            <Text style={[modal.fieldLabel, { marginTop: 16 }]}>Transparency proof</Text>
+
+            {/* Transparency proof section header with icon */}
+            <View style={modal.proofHeader}>
+              <TransparencyReviewIcon size={15} color="#a8c5c2" />
+              <Text style={[modal.fieldLabel, { marginTop: 0, marginLeft: 6, marginBottom: 0 }]}>
+                Transparency proof
+              </Text>
+              <FairnessMeterIcon size={15} color="#607876" />
+            </View>
+
             {checks.map(c => (
               <Pressable key={c.key}
                 style={[modal.checkRow, proof[c.key] && modal.checkRowActive]}
@@ -224,6 +336,7 @@ function CompletionModal({ visible, partner, currentUser, onClose, onSubmit }: C
                 <Text style={modal.checkWeight}>{c.weight}</Text>
               </Pressable>
             ))}
+
             <View style={modal.fairnessRow}>
               <Text style={modal.fairnessLabel}>
                 F = 0.35·{proof.deliveredOnTime ? '1' : '0'} + 0.35·{proof.scopeMatchedAgreement ? '1' : '0'} +
@@ -231,10 +344,12 @@ function CompletionModal({ visible, partner, currentUser, onClose, onSubmit }: C
               </Text>
               <Text style={modal.fairnessValue}>{fairness.toFixed(2)}</Text>
             </View>
+
             <Text style={modal.fieldLabel}>Notes (optional)</Text>
             <TextInput style={[modal.input, { height: 72, textAlignVertical: 'top' }]}
               value={proof.notes} onChangeText={t => setProof(p => ({ ...p, notes: t }))}
               placeholder="Context, evidence links, etc." placeholderTextColor="#607876" multiline />
+
             <View style={modal.actions}>
               <Pressable style={modal.cancelBtn} onPress={onClose}>
                 <Text style={modal.cancelBtnText}>Cancel</Text>
@@ -242,7 +357,10 @@ function CompletionModal({ visible, partner, currentUser, onClose, onSubmit }: C
               <Pressable
                 style={[modal.submitBtn, (!given.trim() || !received.trim()) && modal.submitBtnDisabled]}
                 onPress={handleSubmit} disabled={!given.trim() || !received.trim()}>
-                <Text style={modal.submitBtnText}>Submit Completion →</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <SwapIcon size={16} color="#000" />
+                  <Text style={modal.submitBtnText}>Submit Completion</Text>
+                </View>
               </Pressable>
             </View>
           </ScrollView>
@@ -264,6 +382,7 @@ function MatchCard({
 }) {
   const [showMath,  setShowMath]  = useState(false);
   const [showTrust, setShowTrust] = useState(false);
+  const [saved, setSaved] = useState(false);
   const scores = useMemo(() => matchScore(currentUser, user), [user, currentUser]);
 
   const isConnected = connections.has(user.id);
@@ -287,11 +406,23 @@ function MatchCard({
           <Text style={styles.avatarEmoji}>{user.avatar}</Text>
         </View>
         <View style={{ flex: 1, marginLeft: 10 }}>
-          <Text style={styles.cardName}>{user.name}</Text>
+          {/* Name row: VerifiedIcon inline with name */}
+          <View style={styles.nameRow}>
+            <Text style={styles.cardName}>{user.name}</Text>
+            <VerifiedIcon size={13} color="#4f98a3" />
+          </View>
           <Text style={styles.cardOffersLine} numberOfLines={1}>
             Offers: {user.offers.join(', ')}
           </Text>
         </View>
+        {/* SaveSkillIcon — bookmark, filled when saved */}
+        <Pressable
+          onPress={() => setSaved(s => !s)}
+          style={styles.saveBtn}
+          accessibilityLabel={saved ? 'Unsave skill' : 'Save skill'}
+        >
+          <SaveSkillIcon size={18} color={saved ? '#61d8cc' : '#394140'} filled={saved} />
+        </Pressable>
         <View style={[styles.scoreBadge, { borderColor: badgeColor }]}>
           <Text style={[styles.scoreBadgeText, { color: badgeColor }]}>
             {Math.round(scores.total * 100)}%
@@ -323,15 +454,19 @@ function MatchCard({
       {/* Why This Match — plain English */}
       <WhyCard you={currentUser} other={user} scores={scores} />
 
-      {/* Score bars — trust bar label is tappable to expand T(u) */}
+      {/* Score bars — trust bar label tappable to expand T(u) */}
       <View style={styles.barsSection}>
         <View style={styles.barRow}>
           <Text style={styles.barLabel}>SkillFit</Text>
           <ScoreBar value={scores.sf} color="#61d8cc" />
           <Text style={styles.barValue}>{scores.sf.toFixed(2)}</Text>
         </View>
+        {/* Trust row: VerifiedIcon as inline label prefix */}
         <Pressable onPress={() => toggle(setShowTrust)} style={styles.barRow}>
-          <Text style={[styles.barLabel, styles.barLabelTappable]}>Trust ▾</Text>
+          <View style={styles.barLabelRow}>
+            <VerifiedIcon size={11} color="#4f98a3" />
+            <Text style={[styles.barLabel, styles.barLabelTappable]}>Trust▾</Text>
+          </View>
           <ScoreBar value={scores.tc} color="#4f98a3" />
           <Text style={styles.barValue}>{scores.tc.toFixed(2)}</Text>
         </Pressable>
@@ -351,7 +486,7 @@ function MatchCard({
       </Pressable>
       {showMath && <MathPanel scores={scores} user={user} />}
 
-      {/* Action buttons */}
+      {/* Action buttons — icons wired */}
       <View style={styles.actionRow}>
         {isDone ? (
           <View style={[styles.actionBtn, styles.doneBtn]}>
@@ -360,20 +495,32 @@ function MatchCard({
         ) : isConnected ? (
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <View style={[styles.actionBtn, styles.connectedBtn, { flex: 1 }]}>
-              <Text style={styles.actionBtnText}>✓ Connected</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <NegotiateIcon size={16} color="#1f4642" />
+                <Text style={styles.actionBtnText}>Connected</Text>
+              </View>
             </View>
             <Pressable style={[styles.actionBtn, styles.completeBtn, { flex: 1 }]}
               onPress={() => onComplete(user)}>
-              <Text style={styles.actionBtnText}>Complete Swap ✦</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <SwapIcon size={16} color="#000" />
+                <Text style={styles.actionBtnText}>Complete Swap</Text>
+              </View>
             </Pressable>
           </View>
         ) : isRequested ? (
           <Pressable style={[styles.actionBtn, styles.acceptBtn]} onPress={() => connect(user.id)}>
-            <Text style={styles.actionBtnText}>Accept Match ✓</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <SwapIcon size={16} color="#000" />
+              <Text style={styles.actionBtnText}>Accept Match</Text>
+            </View>
           </Pressable>
         ) : (
           <Pressable style={[styles.actionBtn, styles.requestBtn]} onPress={() => request(user.id)}>
-            <Text style={styles.actionBtnText}>Request Match ›</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <SwapIcon size={16} color="#000" />
+              <Text style={styles.actionBtnText}>Request Match</Text>
+            </View>
           </Pressable>
         )}
       </View>
@@ -399,7 +546,7 @@ export default function MatchHub() {
 
   const pending = MOCK_USERS.length - connections.size - requests.size - completed.size;
 
-  const handleComplete   = useCallback((partner: MatchUser) => setCompletionTarget(partner), []);
+  const handleComplete = useCallback((partner: MatchUser) => setCompletionTarget(partner), []);
   const handleSubmitCompletion = useCallback(
     (given: string, received: string, proof: ProofField) => {
       if (!completionTarget) return;
@@ -436,8 +583,12 @@ export default function MatchHub() {
               <Text style={styles.statLabel}>Pending</Text>
             </View>
           </View>
+          {/* History button with HistoryIcon */}
           <Pressable style={styles.historyBtn} onPress={() => router.push('/transaction/history')}>
-            <Text style={styles.historyBtnText}>History ({completed.size}) ›</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <HistoryIcon size={14} color="#61d8cc" />
+              <Text style={styles.historyBtnText}>History ({completed.size})</Text>
+            </View>
           </Pressable>
         </View>
       </View>
@@ -516,6 +667,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', padding: 12,
     borderBottomWidth: 1, borderBottomColor: '#d0d2ce',
   },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 2 },
   avatarBox: {
     width: 44, height: 44, backgroundColor: '#61d8cc',
     borderWidth: 2, borderColor: '#1f4642',
@@ -524,6 +676,7 @@ const styles = StyleSheet.create({
   avatarEmoji:     { fontSize: 22 },
   cardName:        { fontSize: 17, fontWeight: '800', color: '#101414' },
   cardOffersLine:  { fontSize: 12, color: '#394140', marginTop: 1 },
+  saveBtn:         { padding: 6, marginRight: 4 },
   scoreBadge: {
     borderWidth: 2, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 4,
     alignItems: 'center', justifyContent: 'center', minWidth: 50,
@@ -547,7 +700,8 @@ const styles = StyleSheet.create({
   // Bars
   barsSection: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 6, gap: 6 },
   barRow:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  barLabel: { fontSize: 11, fontWeight: '700', color: '#2f3333', width: 60, fontFamily: MONO },
+  barLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 3, width: 60 },
+  barLabel: { fontSize: 11, fontWeight: '700', color: '#2f3333', fontFamily: MONO },
   barLabelTappable: { color: '#1f4642', textDecorationLine: 'underline' },
   barTrack: { flex: 1, height: 8, backgroundColor: '#d0d2ce', borderRadius: 2, overflow: 'hidden' },
   barFill:  { height: '100%', borderRadius: 2 },
@@ -598,12 +752,17 @@ const modal = StyleSheet.create({
     borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, maxHeight: '90%',
   },
   handle: { width: 40, height: 4, backgroundColor: '#607876', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
-  title:    { fontSize: 18, fontWeight: '900', color: '#61d8cc', marginBottom: 4 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6 },
+  title:    { fontSize: 18, fontWeight: '900', color: '#61d8cc' },
   subtitle: { fontSize: 12, color: '#607876', marginBottom: 16, lineHeight: 18 },
-  fieldLabel: { fontSize: 11, fontWeight: '700', color: '#a8c5c2', letterSpacing: 0.8, marginBottom: 6 },
+  fieldLabel: { fontSize: 11, fontWeight: '700', color: '#a8c5c2', letterSpacing: 0.8, marginBottom: 6, marginTop: 16 },
   input: {
     backgroundColor: '#131b1b', borderWidth: 1, borderColor: '#2f4a47',
     color: '#fff', padding: 10, fontSize: 14, marginBottom: 14, fontFamily: MONO,
+  },
+  proofHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#2f4a47', marginBottom: 8,
   },
   checkRow: {
     flexDirection: 'row', alignItems: 'center', padding: 12, marginBottom: 6,
