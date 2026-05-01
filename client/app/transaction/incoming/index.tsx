@@ -14,7 +14,7 @@ import {
   View, Text, StyleSheet, ScrollView,
   Pressable, SafeAreaView, StatusBar,
 } from 'react-native';
-import Svg, { Path, Circle } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { router } from 'expo-router';
 import { useMatchingState, matchScore, whyThisMatch } from '@/lib/matching/matching';
 import { MOCK_USERS, YOU } from '@/lib/matching/data';
@@ -133,12 +133,16 @@ function RequestCard({
 
       {/* Actions */}
       <View style={rc.actions}>
-        <Pressable style={rc.declineBtn} onPress={onDecline}
+        <Pressable
+          style={rc.declineBtn}
+          onPress={onDecline}
           accessibilityLabel={`Decline ${user.name}`}>
           <DeclineIcon />
           <Text style={rc.declineBtnText}>Decline</Text>
         </Pressable>
-        <Pressable style={rc.acceptBtn} onPress={onAccept}
+        <Pressable
+          style={rc.acceptBtn}
+          onPress={onAccept}
           accessibilityLabel={`Accept ${user.name}`}>
           <AcceptIcon />
           <Text style={rc.acceptBtnText}>Accept Match</Text>
@@ -151,23 +155,7 @@ function RequestCard({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function IncomingScreen() {
-  const { requests, connect, request } = useMatchingState();
-
-  // "decline" = remove from requests without connecting
-  // We expose this by sending a no-op that clears the request
-  // (in a real app this would call an API; here we monkey-patch the set)
-  function decline(userId: string) {
-    // Access the module-level set directly via the exported function
-    // Simplest demo approach: just call connect then immediately treat as declined
-    // Real implementation would add a `declineRequest` export to matching.ts
-    // For now we simulate by calling the internal state
-    const { default: matching } = require('@/lib/matching/matching');
-    // Fallback: import the raw function
-    import('@/lib/matching/matching').then(m => {
-      // Remove from requests by toggling state
-      // Since we don't have a decline function yet, we'll add it
-    });
-  }
+  const { requests, connect, decline } = useMatchingState();
 
   const pendingIds = useMemo(() => [...requests], [requests]);
 
@@ -203,10 +191,7 @@ export default function IncomingScreen() {
               key={uid}
               userId={uid}
               onAccept={() => connect(uid)}
-              onDecline={() => {
-                // In demo: decline by sending a counter-request that gets ignored
-                // We'll add declineRequest to matching.ts
-              }}
+              onDecline={() => decline(uid)}
             />
           ))}
         </ScrollView>
