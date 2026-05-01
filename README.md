@@ -1,6 +1,6 @@
 # SkillSwap — COGS 128 Final Project
 
-A skill-based bartering app that matches people by what they can teach each other, not by money. Built for COGS 128 to demonstrate how discrete mathematics — set intersections, weighted trust functions, and graph-theoretic matching — can power a real social application.
+A skill-based bartering app that matches people by what they can teach each other, not by money. Built for a project in Cognitive Engeineering at UC Merced to demonstrate how discrete mathematics, set intersections, weighted trust functions, and graph-theoretic matching, can power a real social application.
 
 ---
 
@@ -16,7 +16,7 @@ When a swap is completed, instead of a star rating that anyone can game, you con
 
 ## The Math Model
 
-The matching system is built on four functions from the COGS 128 discrete math model:
+The matching system is built on four functions from discrete mathematics models:
 
 ### Trust Score — T(u)
 Measures how reliable a user is based on verifiable signals, not reputation alone.
@@ -75,7 +75,7 @@ For new connections F defaults to 1.0. After a swap completes, F is computed fro
 
 ---
 
-## How to Run It (for teammates with no terminal experience)
+## How to Run It (for anyone with no terminal experience)
 
 You do **not** need to clone this repo or run any commands. Just use the **Expo Go** app.
 
