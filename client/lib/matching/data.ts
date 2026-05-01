@@ -1,17 +1,14 @@
 /**
  * Seed users for SkillSwap matching demo.
- * Based on interview subjects from the COGS 128 research data.
  *
- * Three users (Alex, Maria, Daniel) have pre-seeded completed swaps so the
- * History screen is never empty on first load — the three proof scenarios show
- * the full fairness spectrum: perfect (F=1.0), late delivery (F=0.50),
- * and strong-but-no-evidence (F=0.85).
- *
- * The remaining three (Jasmine, Kevin, Lina) are available to interact with live.
+ * Pre-seeded state:
+ *   completed:  Alex (F=1.0), Maria (F=0.85), Daniel (F=0.50)
+ *   connected:  Jasmine, Kevin  ← live active swaps in Ongoing screen
+ *   requested:  Lina             ← incoming request waiting for acceptance
  */
 
 import type { MatchUser } from './matching';
-import { completeSwap } from './matching';
+import { completeSwap, sendRequest, confirmConnect } from './matching';
 
 export const YOU: MatchUser = {
   id: 'you',
@@ -101,51 +98,85 @@ export const MOCK_USERS: MatchUser[] = [
   },
 ];
 
-// ─── Demo history seed ────────────────────────────────────────────────────────
-// Pre-populate 3 completed swaps so History shows real data immediately.
-// Scenarios are chosen to demonstrate the full fairness spectrum:
-//
-//   Alex  — perfect swap (F=1.0):  on time, scope matched, evidence, would swap again
-//   Maria — great swap (F=0.85):   on time, scope matched, would swap again (no evidence uploaded)
-//   Daniel — late delivery (F=0.50): scope matched + would swap again, but late & no evidence
+const [alex, maria, daniel, jasmine, kevin, lina] = MOCK_USERS;
 
-const [alex, maria, daniel] = MOCK_USERS;
+// ─── Completed swaps (history seed) ──────────────────────────────────────────
 
 completeSwap(
   alex, YOU,
   'Web Dev', 'Graphic Design',
-  {
-    deliveredOnTime:          true,
-    scopeMatchedAgreement:    true,
-    portfolioEvidenceAttached: true,
-    wouldSwapAgain:           true,
-    notes: 'Alex redesigned the landing page — clean work, delivered in 3 days.',
-  },
+  { deliveredOnTime: true, scopeMatchedAgreement: true,
+    portfolioEvidenceAttached: true, wouldSwapAgain: true,
+    notes: 'Alex redesigned the landing page — clean work, delivered in 3 days.' },
   '2026-04-20T14:00:00.000Z',
 );
 
 completeSwap(
   maria, YOU,
   'Linux Admin', 'Photography',
-  {
-    deliveredOnTime:          true,
-    scopeMatchedAgreement:    true,
-    portfolioEvidenceAttached: false,
-    wouldSwapAgain:           true,
-    notes: 'Maria shot 40 edited photos. No portfolio link yet — she said she would upload later.',
-  },
+  { deliveredOnTime: true, scopeMatchedAgreement: true,
+    portfolioEvidenceAttached: false, wouldSwapAgain: true,
+    notes: 'Maria shot 40 edited photos. No portfolio link yet — she said she would upload later.' },
   '2026-04-15T10:30:00.000Z',
 );
 
 completeSwap(
   daniel, YOU,
   'Web Dev', 'Bookkeeping',
-  {
-    deliveredOnTime:          false,
-    scopeMatchedAgreement:    true,
-    portfolioEvidenceAttached: false,
-    wouldSwapAgain:           true,
-    notes: 'Bookkeeping was solid but Daniel ran 5 days late. Would swap again for the right project.',
-  },
+  { deliveredOnTime: false, scopeMatchedAgreement: true,
+    portfolioEvidenceAttached: false, wouldSwapAgain: true,
+    notes: 'Bookkeeping was solid but Daniel ran 5 days late.' },
   '2026-04-10T09:00:00.000Z',
 );
+
+// ─── Live active swaps (Ongoing screen seed) ──────────────────────────────────
+// Jasmine and Kevin are already connected — their swaps are in-progress.
+// The Ongoing screen reads connections from the state store.
+
+confirmConnect(jasmine.id);   // You & Jasmine: you build her site, she styles your event
+confirmConnect(kevin.id);     // You & Kevin: you do his books (via Daniel's referral), he details your car
+
+// ─── Incoming request (Incoming screen seed) ──────────────────────────────────
+// Lina sent YOU a request — waiting in the Incoming screen.
+
+sendRequest(lina.id);
+
+// ─── Active swap metadata ─────────────────────────────────────────────────────
+// Scope + deadline for each live connection so Ongoing screen feels real.
+
+export type ActiveSwapMeta = {
+  userId: string;
+  youGive: string;
+  theyGive: string;
+  agreedScope: string;
+  deadlineIso: string;    // ISO string
+  checkIns: { date: string; note: string; fromMe: boolean }[];
+};
+
+export const ACTIVE_SWAPS: ActiveSwapMeta[] = [
+  {
+    userId: 'jasmine',
+    youGive: 'Web Dev',
+    theyGive: 'Event Styling',
+    agreedScope:
+      'Build a 3-page portfolio site (Home, Gallery, Contact). Mobile-first. Deliver by May 10.',
+    deadlineIso: '2026-05-10T23:59:00.000Z',
+    checkIns: [
+      { date: '2026-04-28T09:00:00.000Z', note: 'Wireframes sent for review — waiting on feedback.', fromMe: true },
+      { date: '2026-04-29T11:30:00.000Z', note: 'Love the layout! Can we swap the gallery to a grid?', fromMe: false },
+      { date: '2026-04-30T15:00:00.000Z', note: 'Grid done. Pushing final build tomorrow.', fromMe: true },
+    ],
+  },
+  {
+    userId: 'kevin',
+    youGive: 'Linux Admin',
+    theyGive: 'Car Detailing (full exterior + interior)',
+    agreedScope:
+      'Set up home server with Tailscale remote access + automated backups. Deliver by May 7.',
+    deadlineIso: '2026-05-07T23:59:00.000Z',
+    checkIns: [
+      { date: '2026-04-27T14:00:00.000Z', note: 'SSH keys exchanged. Starting Tailscale config tonight.', fromMe: true },
+      { date: '2026-04-28T18:00:00.000Z', note: 'Remote access works! When can I drop off the car?', fromMe: false },
+    ],
+  },
+];

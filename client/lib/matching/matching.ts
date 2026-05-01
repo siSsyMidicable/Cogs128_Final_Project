@@ -1,14 +1,13 @@
 /**
  * SkillSwap Discrete Math Matching Engine
  *
- * Based on the COGS 128 math model:
- *   T(u)    = trust score (weighted portfolio, ratings, verification, consistency, communication)
- *   SF(u,v) = SkillFit — how well offered/needed skills overlap
- *   TC(u,v) = Trust Compatibility — geometric mean of both trust scores
- *   M(u,v)  = 0.34·SF + 0.33·TC + 0.33·F  (overall match score)
+ * T(u)    = trust score (weighted portfolio, ratings, verification, consistency, communication)
+ * SF(u,v) = SkillFit — how well offered/needed skills overlap
+ * TC(u,v) = Trust Compatibility — geometric mean of both trust scores
+ * M(u,v)  = 0.34·SF + 0.33·TC + 0.33·F
  *
- *   F for completed swaps is computed from verifiable proof fields,
- *   not a raw star rating that can be gamed.
+ * F for completed swaps is computed from verifiable proof fields,
+ * not a raw star rating that can be gamed.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -18,34 +17,25 @@ import { useState, useEffect, useCallback } from 'react';
 export type MatchUser = {
   id: string;
   name: string;
-  avatar: string;         // emoji
-  offers: string[];       // O(u) ⊆ S — skills user offers
-  requests: string[];     // R(u) ⊆ S — skills user wants to receive
-  portfolio: number;      // P(u)        ∈ [0,1]
-  rating: number;         // R_avg(u)    ∈ [1,5]
-  verified: number;       // V(u)        ∈ {0,1,2}
-  consistency: number;    // C(u)        ∈ [0,1]
-  communication: number;  // Q_comm(u)   ∈ [0,1]
+  avatar: string;
+  offers: string[];
+  requests: string[];
+  portfolio: number;
+  rating: number;
+  verified: number;
+  consistency: number;
+  communication: number;
 };
 
 export type MatchScoreBreakdown = {
-  total: number;  // M(u,v)
-  sf: number;     // SkillFit(u,v)
-  tc: number;     // TrustCompat(u,v)
-  fair: number;   // F(u,v)
-  tu: number;     // T(you)
-  tv: number;     // T(other)
+  total: number;
+  sf: number;
+  tc: number;
+  fair: number;
+  tu: number;
+  tv: number;
 };
 
-/**
- * ProofField — the 4 verifiable transparency checkboxes.
- * These replace a star rating.  Each field is a claim that can be
- * cross-checked against chat logs, portfolio links, or delivery dates.
- *
- * Fairness is computed as a weighted sum so no single field dominates:
- *   F = 0.35·deliveredOnTime + 0.35·scopeMatchedAgreement
- *     + 0.15·portfolioEvidenceAttached + 0.15·wouldSwapAgain
- */
 export type ProofField = {
   deliveredOnTime: boolean;
   scopeMatchedAgreement: boolean;
@@ -63,9 +53,6 @@ export function fairnessFromProof(proof: ProofField): number {
   return f;
 }
 
-/**
- * TrustImpact — human-readable tags derived from proof fields.
- */
 export function trustImpactTags(proof: ProofField): string[] {
   const tags: string[] = [];
   if (proof.deliveredOnTime && proof.scopeMatchedAgreement) tags.push('+consistency');
@@ -83,35 +70,20 @@ export type HistoryRecord = {
   partnerAvatar: string;
   skillGiven: string;
   skillReceived: string;
-  completedAt: string;          // ISO date string
+  completedAt: string;
   proof: ProofField;
   fairness: number;
   scores: MatchScoreBreakdown;
 };
 
-// ─── Core Math Functions ───────────────────────────────────────────────────────
+// ─── Core Math ────────────────────────────────────────────────────────────────
 
-/**
- * T(u) = w_P·P + w_R·R̂ + w_V·V̂ + w_C·C + w_Q·Q
- * R̂ = (R_avg - 1) / 4   rescales [1,5] → [0,1]
- * V̂ = V / 2              rescales {0,1,2} → {0,0.5,1}
- */
 export function trustScore(u: MatchUser): number {
   const rHat = (u.rating - 1) / 4;
   const vHat = u.verified / 2;
-  return (
-    0.2 * u.portfolio +
-    0.3 * rHat +
-    0.2 * vHat +
-    0.2 * u.consistency +
-    0.1 * u.communication
-  );
+  return 0.2 * u.portfolio + 0.3 * rHat + 0.2 * vHat + 0.2 * u.consistency + 0.1 * u.communication;
 }
 
-/**
- * Returns the 5 named components of T(u) for the breakdown panel.
- * P, R̂, V̂, C, Q — each with its weight and raw value.
- */
 export type TrustComponents = {
   P:  { weight: 0.2; value: number };
   Rhat: { weight: 0.3; value: number };
@@ -130,12 +102,6 @@ export function trustComponents(u: MatchUser): TrustComponents {
   };
 }
 
-/**
- * SkillFit(u,v):
- *   forward  = |O(u) ∩ R(v)| / |R(v)|
- *   backward = |O(v) ∩ R(u)| / |R(u)|
- *   SF = (forward + backward) / 2
- */
 export function skillFit(u: MatchUser, v: MatchUser): number {
   if (v.requests.length === 0 || u.requests.length === 0) return 0;
   const forward  = u.offers.filter(s => v.requests.includes(s)).length / v.requests.length;
@@ -143,18 +109,10 @@ export function skillFit(u: MatchUser, v: MatchUser): number {
   return (forward + backward) / 2;
 }
 
-/**
- * TrustCompat(u,v) = √(T(u) · T(v))
- * Geometric mean — both users must have reasonable trust for a high score.
- */
 export function trustCompat(u: MatchUser, v: MatchUser): number {
   return Math.sqrt(trustScore(u) * trustScore(v));
 }
 
-/**
- * M(u,v) = 0.34·SF + 0.33·TC + 0.33·F
- * F defaults to 1.0 for un-completed matches.
- */
 export function matchScore(
   u: MatchUser,
   v: MatchUser,
@@ -165,16 +123,9 @@ export function matchScore(
   const fair = fairOverride !== undefined ? fairOverride : 1.0;
   const tu   = trustScore(u);
   const tv   = trustScore(v);
-  return {
-    sf, tc, fair, tu, tv,
-    total: 0.34 * sf + 0.33 * tc + 0.33 * fair,
-  };
+  return { sf, tc, fair, tu, tv, total: 0.34 * sf + 0.33 * tc + 0.33 * fair };
 }
 
-/**
- * whyThisMatch — plain English summary for a grader or first-time user.
- * Generated entirely from the existing score data; no AI, no hardcoding.
- */
 export function whyThisMatch(
   you: MatchUser,
   other: MatchUser,
@@ -182,27 +133,16 @@ export function whyThisMatch(
 ): string {
   const theyGiveYou = other.offers.filter(s => you.requests.includes(s));
   const youGiveThem = you.offers.filter(s => other.requests.includes(s));
-
   let fitSentence: string;
   if (theyGiveYou.length > 0 && youGiveThem.length > 0) {
-    fitSentence =
-      `${other.name} offers ${theyGiveYou.join(' & ')} (you need it) ` +
-      `and needs ${youGiveThem.join(' & ')} (you offer it) — bilateral fit.`;
+    fitSentence = `${other.name} offers ${theyGiveYou.join(' & ')} (you need it) and needs ${youGiveThem.join(' & ')} (you offer it) — bilateral fit.`;
   } else if (theyGiveYou.length > 0) {
-    fitSentence =
-      `${other.name} covers ${
-        theyGiveYou.length
-      } of your ${you.requests.length} skill need${
-        you.requests.length !== 1 ? 's' : ''
-      }: ${theyGiveYou.join(', ')}.`;
+    fitSentence = `${other.name} covers ${theyGiveYou.length} of your ${you.requests.length} skill need${you.requests.length !== 1 ? 's' : ''}: ${theyGiveYou.join(', ')}.`;
   } else if (youGiveThem.length > 0) {
-    fitSentence =
-      `You offer ${youGiveThem.join(' & ')} which ${other.name} needs, ` +
-      `but they don't cover your current skill requests.`;
+    fitSentence = `You offer ${youGiveThem.join(' & ')} which ${other.name} needs, but they don't cover your current skill requests.`;
   } else {
     fitSentence = `No direct skill overlap — ranked on trust compatibility alone (TC=${scores.tc.toFixed(2)}).`;
   }
-
   let trustSentence: string;
   if (scores.tc >= 0.80) {
     trustSentence = `Trust is strong (TC=${scores.tc.toFixed(2)}) — both profiles are verified and consistent.`;
@@ -211,7 +151,6 @@ export function whyThisMatch(
   } else {
     trustSentence = `Trust is modest (TC=${scores.tc.toFixed(2)}) — review their portfolio before committing.`;
   }
-
   return `${fitSentence} ${trustSentence}`;
 }
 
@@ -232,6 +171,15 @@ export function sendRequest(userId: string) {
 export function confirmConnect(userId: string) {
   _requests.delete(userId);
   _connections.add(userId);
+  _notify();
+}
+
+/**
+ * declineRequest — remove from pending requests without connecting.
+ * Added to support the Incoming screen Decline action.
+ */
+export function declineRequest(userId: string) {
+  _requests.delete(userId);
   _notify();
 }
 
@@ -281,12 +229,13 @@ export function useMatchingState() {
   }, []);
   const request  = useCallback((id: string) => sendRequest(id), []);
   const connect  = useCallback((id: string) => confirmConnect(id), []);
+  const decline  = useCallback((id: string) => declineRequest(id), []);
   const complete = useCallback(
     (partner: MatchUser, cu: MatchUser, given: string, received: string, proof: ProofField) =>
       completeSwap(partner, cu, given, received, proof),
     [],
   );
-  return { ...state, request, connect, complete };
+  return { ...state, request, connect, decline, complete };
 }
 
 export function useHistoryState() {
