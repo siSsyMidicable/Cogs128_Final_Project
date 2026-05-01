@@ -5,6 +5,7 @@
  *
  * Features:
  *   • "Show Math" — expandable dark panel with live formula substitution
+ *   • Symbol Glossary — tap any symbol row to expand plain-English explanation
  *   • "Why This Match?" — plain English auto-generated summary per card
  *   • Trust Score Breakdown — tap the Trust bar label to expand T(u) components
  *   • Complete Swap — bottom-sheet modal with proof checkboxes + live F preview
@@ -48,8 +49,6 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 const MONO: any = Platform.OS === 'ios' ? 'Courier' : 'monospace';
 
 // ─── Inline Icon Components ───────────────────────────────────────────────────
-// Rendered inline so no extra import chain is needed for this screen.
-// All on 24px grid, 1.75px stroke, stroke-only unless `filled`.
 
 function SwapIcon({ size = 18, color = '#000' }: { size?: number; color?: string }) {
   return (
@@ -166,6 +165,116 @@ function Chip({ label, variant }: { label: string; variant: 'offer' | 'request' 
   );
 }
 
+// ─── Symbol Glossary ──────────────────────────────────────────────────────────
+// Each entry: symbol shown in formula, plain-English label, full explanation.
+// Tap a row to expand the explanation. Tap again to collapse.
+
+const SYMBOL_GLOSSARY = [
+  {
+    sym: 'M(u,v)',
+    label: 'Match Score',
+    plain: 'The final score (0–1) ranking how good a swap partner this person is for you. Higher = better match. Combines skill overlap, trust, and past fairness equally.',
+  },
+  {
+    sym: 'SF',
+    label: 'Skill Fit',
+    plain: 'How well your skills and their skills overlap — in both directions. If you teach what they need AND they teach what you need, SF is high. Uses set intersection: the skills both lists share divided by the total skills needed.',
+  },
+  {
+    sym: 'O(u)',
+    label: 'Offers (set)',
+    plain: 'The set of skills a user offers to teach. A "set" in discrete math means a unique, unordered collection — no duplicates. O(you) = everything you can teach.',
+  },
+  {
+    sym: 'R(u)',
+    label: 'Requests (set)',
+    plain: 'The set of skills a user wants to learn. R(you) = everything you want to learn.',
+  },
+  {
+    sym: '∩',
+    label: 'Intersection',
+    plain: 'The "∩" symbol means intersection — the items that appear in BOTH sets. O(you) ∩ R(them) = the skills you offer that they actually need. The bigger this overlap, the better the fit.',
+  },
+  {
+    sym: '|·|',
+    label: 'Set Size (cardinality)',
+    plain: 'The vertical bars around a set mean "how many items are in it". |{Python, Design}| = 2. Dividing by this normalizes the score to a 0–1 range regardless of how many skills each person listed.',
+  },
+  {
+    sym: 'TC',
+    label: 'Trust Compatibility',
+    plain: 'The geometric mean of both users\' trust scores. Geometric mean (square root of the product) is used instead of average because one untrustworthy person tanks the whole swap — both parties need decent trust for TC to be high.',
+  },
+  {
+    sym: '√',
+    label: 'Square Root (geometric mean)',
+    plain: 'TC = √(T(you) × T(them)). If one trust score is 0, the whole product is 0 — no matter how high the other is. This is intentional: a swap is only as safe as its least-trusted participant.',
+  },
+  {
+    sym: 'T(u)',
+    label: 'Trust Score',
+    plain: 'A weighted composite of 5 verifiable signals: Portfolio quality (P), average rating (R̂), verification level (V̂), consistency of past swaps (C), and communication responsiveness (Q). Each weight reflects how much that signal predicts swap success.',
+  },
+  {
+    sym: 'F',
+    label: 'Fairness Score',
+    plain: 'Computed after a swap completes from 4 verifiable checkboxes — not a star rating. Delivered on time? Scope matched? Evidence attached? Would swap again? These are harder to fake than a 5-star tap.',
+  },
+  {
+    sym: '0.34 / 0.33',
+    label: 'Weights',
+    plain: 'The three components (SF, TC, F) are weighted almost equally. SF gets a tiny edge (0.34 vs 0.33) because SkillSwap is skill-first — finding someone who can actually teach what you need matters most.',
+  },
+];
+
+function GlossaryRow({ sym, label, plain }: { sym: string; label: string; plain: string }) {
+  const [open, setOpen] = useState(false);
+  function toggle() {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setOpen(v => !v);
+  }
+  return (
+    <Pressable onPress={toggle} style={glossary.row}>
+      <View style={glossary.symRow}>
+        <Text style={glossary.sym}>{sym}</Text>
+        <Text style={glossary.label}>{label}</Text>
+        <Text style={glossary.chevron}>{open ? '▲' : '▼'}</Text>
+      </View>
+      {open && (
+        <View style={glossary.explanation}>
+          <Text style={glossary.plainText}>{plain}</Text>
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
+function SymbolGlossary() {
+  const [expanded, setExpanded] = useState(false);
+  function toggle() {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpanded(v => !v);
+  }
+  return (
+    <View style={glossary.container}>
+      <Pressable onPress={toggle} style={glossary.header}>
+        <Text style={glossary.headerText}>📖  What do these symbols mean?</Text>
+        <Text style={glossary.chevron}>{expanded ? '▲' : '▼'}</Text>
+      </Pressable>
+      {expanded && (
+        <View style={glossary.list}>
+          <Text style={glossary.intro}>
+            Tap any symbol to read a plain-English explanation.
+          </Text>
+          {SYMBOL_GLOSSARY.map(g => (
+            <GlossaryRow key={g.sym} {...g} />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
 // ─── MathPanel ────────────────────────────────────────────────────────────────
 
 function MathPanel({ scores, user }: { scores: MatchScoreBreakdown; user: MatchUser }) {
@@ -203,6 +312,10 @@ function MathPanel({ scores, user }: { scores: MatchScoreBreakdown; user: MatchU
       <Text style={styles.mathLine}>
         T(you) = {scores.tu.toFixed(3)} | T({user.name}) = {scores.tv.toFixed(3)}
       </Text>
+
+      {/* Symbol Glossary — tap to expand plain-English explanations */}
+      <View style={styles.mathDivider} />
+      <SymbolGlossary />
     </View>
   );
 }
@@ -298,7 +411,6 @@ function CompletionModal({ visible, partner, currentUser, onClose, onSubmit }: C
         <View style={modal.sheet}>
           <View style={modal.handle} />
 
-          {/* Modal header with SwapIcon */}
           <View style={modal.titleRow}>
             <SwapIcon size={20} color="#61d8cc" />
             <Text style={modal.title}>Complete Swap with {partner.name}</Text>
@@ -316,7 +428,6 @@ function CompletionModal({ visible, partner, currentUser, onClose, onSubmit }: C
             <TextInput style={modal.input} value={received} onChangeText={setReceived}
               placeholder={partner.offers[0] ?? 'e.g. Graphic Design'} placeholderTextColor="#607876" />
 
-            {/* Transparency proof section header with icon */}
             <View style={modal.proofHeader}>
               <TransparencyReviewIcon size={15} color="#a8c5c2" />
               <Text style={[modal.fieldLabel, { marginTop: 0, marginLeft: 6, marginBottom: 0 }]}>
@@ -400,13 +511,11 @@ function MatchCard({
 
   return (
     <View style={styles.card}>
-      {/* Header */}
       <View style={styles.cardHeader}>
         <View style={styles.avatarBox}>
           <Text style={styles.avatarEmoji}>{user.avatar}</Text>
         </View>
         <View style={{ flex: 1, marginLeft: 10 }}>
-          {/* Name row: VerifiedIcon inline with name */}
           <View style={styles.nameRow}>
             <Text style={styles.cardName}>{user.name}</Text>
             <VerifiedIcon size={13} color="#4f98a3" />
@@ -415,7 +524,6 @@ function MatchCard({
             Offers: {user.offers.join(', ')}
           </Text>
         </View>
-        {/* SaveSkillIcon — bookmark, filled when saved */}
         <Pressable
           onPress={() => setSaved(s => !s)}
           style={styles.saveBtn}
@@ -430,7 +538,6 @@ function MatchCard({
         </View>
       </View>
 
-      {/* Skill overlap chips */}
       {theyCoverYourNeeds.length > 0 && (
         <View style={styles.highlightRow}>
           <Text style={styles.highlightLabel}>✓ They cover your need: </Text>
@@ -451,17 +558,14 @@ function MatchCard({
         <Text style={styles.noOverlap}>— No direct skill overlap</Text>
       )}
 
-      {/* Why This Match — plain English */}
       <WhyCard you={currentUser} other={user} scores={scores} />
 
-      {/* Score bars — trust bar label tappable to expand T(u) */}
       <View style={styles.barsSection}>
         <View style={styles.barRow}>
           <Text style={styles.barLabel}>SkillFit</Text>
           <ScoreBar value={scores.sf} color="#61d8cc" />
           <Text style={styles.barValue}>{scores.sf.toFixed(2)}</Text>
         </View>
-        {/* Trust row: VerifiedIcon as inline label prefix */}
         <Pressable onPress={() => toggle(setShowTrust)} style={styles.barRow}>
           <View style={styles.barLabelRow}>
             <VerifiedIcon size={11} color="#4f98a3" />
@@ -478,7 +582,6 @@ function MatchCard({
         </View>
       </View>
 
-      {/* Math toggle */}
       <Pressable onPress={() => toggle(setShowMath)} style={styles.mathToggle}>
         <Text style={styles.mathToggleText}>
           {showMath ? '▲ Hide Math' : `▼ Show Math  M(you, ${user.name})`}
@@ -486,7 +589,6 @@ function MatchCard({
       </Pressable>
       {showMath && <MathPanel scores={scores} user={user} />}
 
-      {/* Action buttons — icons wired */}
       <View style={styles.actionRow}>
         {isDone ? (
           <View style={[styles.actionBtn, styles.doneBtn]}>
@@ -583,7 +685,6 @@ export default function MatchHub() {
               <Text style={styles.statLabel}>Pending</Text>
             </View>
           </View>
-          {/* History button with HistoryIcon */}
           <Pressable style={styles.historyBtn} onPress={() => router.push('/transaction/history')}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <HistoryIcon size={14} color="#61d8cc" />
@@ -688,16 +789,12 @@ const styles = StyleSheet.create({
   },
   highlightLabel:  { fontSize: 12, fontWeight: '700', color: '#2a8780' },
   noOverlap:       { fontSize: 12, color: '#888', paddingHorizontal: 12, paddingTop: 8, fontStyle: 'italic' },
-
-  // Why This Match
   whyCard: {
     backgroundColor: '#e8ebe5', borderTopWidth: 1, borderTopColor: '#d0d2ce',
     paddingHorizontal: 12, paddingVertical: 8, marginTop: 4,
   },
   whyLabel: { fontSize: 9, fontWeight: '800', color: '#607876', letterSpacing: 1.3, marginBottom: 3 },
   whyText:  { fontSize: 13, color: '#2f3333', lineHeight: 19 },
-
-  // Bars
   barsSection: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 6, gap: 6 },
   barRow:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
   barLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 3, width: 60 },
@@ -706,8 +803,6 @@ const styles = StyleSheet.create({
   barTrack: { flex: 1, height: 8, backgroundColor: '#d0d2ce', borderRadius: 2, overflow: 'hidden' },
   barFill:  { height: '100%', borderRadius: 2 },
   barValue: { fontSize: 11, fontWeight: '700', color: '#2f3333', width: 32, textAlign: 'right', fontFamily: MONO },
-
-  // Trust breakdown
   trustBreakdown: {
     backgroundColor: '#1c2424', paddingHorizontal: 12, paddingVertical: 10,
     marginTop: 2, gap: 5,
@@ -718,7 +813,6 @@ const styles = StyleSheet.create({
   trustBreakdownLabel:  { fontSize: 11, color: '#a8c5c2', width: 88 },
   trustBreakdownVal:    { fontSize: 11, color: '#61d8cc', fontWeight: '700', width: 32, textAlign: 'right', fontFamily: MONO },
   trustBreakdownWeight: { fontSize: 10, color: '#607876', width: 28, fontFamily: MONO },
-
   mathToggle: {
     borderTopWidth: 1, borderTopColor: '#d0d2ce',
     paddingVertical: 8, paddingHorizontal: 12, backgroundColor: '#e8ebe5',
@@ -734,7 +828,6 @@ const styles = StyleSheet.create({
   mathTotal:   { fontSize: 12, color: '#fff', fontFamily: MONO, fontWeight: '700' },
   mathTotalValue: { color: '#61d8cc', fontWeight: '900' },
   mathNote:    { fontSize: 11, color: '#607876', fontFamily: MONO, marginTop: 2 },
-
   actionRow: { borderTopWidth: 1, borderTopColor: '#d0d2ce', padding: 10 },
   actionBtn: { paddingVertical: 11, alignItems: 'center', borderWidth: 2, flex: 1 },
   actionBtnText: { fontSize: 15, fontWeight: '800', color: '#000' },
@@ -743,6 +836,37 @@ const styles = StyleSheet.create({
   connectedBtn: { backgroundColor: '#d0f0ec', borderColor: '#2a8780' },
   completeBtn:  { backgroundColor: '#FFD166', borderColor: '#8a6800' },
   doneBtn:      { backgroundColor: '#e8ebe5', borderColor: '#999' },
+});
+
+// ─── Glossary Styles ──────────────────────────────────────────────────────────
+const glossary = StyleSheet.create({
+  container: { marginTop: 4 },
+  header: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: '#131b1b', paddingHorizontal: 10, paddingVertical: 8,
+    borderWidth: 1, borderColor: '#2f4a47',
+  },
+  headerText: { fontSize: 12, fontWeight: '700', color: '#a8c5c2' },
+  chevron:    { fontSize: 10, color: '#607876' },
+  list:       { borderWidth: 1, borderTopWidth: 0, borderColor: '#2f4a47' },
+  intro: {
+    fontSize: 11, color: '#607876', fontStyle: 'italic',
+    paddingHorizontal: 10, paddingVertical: 6,
+    borderBottomWidth: 1, borderBottomColor: '#2f4a47',
+  },
+  row: {
+    borderBottomWidth: 1, borderBottomColor: '#1e2e2c',
+    paddingHorizontal: 10, paddingVertical: 8,
+    backgroundColor: '#111a1a',
+  },
+  symRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sym:   { fontSize: 13, fontWeight: '900', color: '#61d8cc', fontFamily: 'monospace' as any, width: 64 },
+  label: { flex: 1, fontSize: 12, color: '#a8c5c2' },
+  explanation: {
+    marginTop: 6, paddingTop: 6,
+    borderTopWidth: 1, borderTopColor: '#1e2e2c',
+  },
+  plainText: { fontSize: 12, color: '#cde0de', lineHeight: 18 },
 });
 
 const modal = StyleSheet.create({
