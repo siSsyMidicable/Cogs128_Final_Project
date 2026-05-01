@@ -100,7 +100,7 @@ export default function IntroScreen() {
           <View style={styles.hero}>
             <View style={[styles.heroGlow, styles.heroGlowOuter]} />
             <View style={[styles.heroGlow, styles.heroGlowInner]} />
-            <Text style={styles.title}>Skill Barter</Text>
+            <Text style={styles.title}>Skill Swap</Text>
             <Text style={styles.subtitle}>Trade your skills, grow together</Text>
           </View>
 
