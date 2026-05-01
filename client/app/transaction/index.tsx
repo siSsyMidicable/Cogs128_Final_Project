@@ -24,7 +24,7 @@ import { YOU, MOCK_USERS } from '@/lib/matching/data';
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental)
   UIManager.setLayoutAnimationEnabledExperimental(true);
 
-// ─── tiny helpers ─────────────────────────────────────────────────────────────
+// ─── tiny helpers ──────────────────────────────────────────────────────────────────
 
 function pct(v: number) { return `${Math.round(v * 100)}%`; }
 
@@ -96,7 +96,7 @@ function TransparencyIcon({ size = 15, color = '#a8c5c2' }: { size?: number; col
   );
 }
 
-// ─── ScoreBar ─────────────────────────────────────────────────────────────────
+// ─── ScoreBar ───────────────────────────────────────────────────────────────────
 
 function ScoreBar({ value, color }: { value: number; color: string }) {
   return (
@@ -106,7 +106,7 @@ function ScoreBar({ value, color }: { value: number; color: string }) {
   );
 }
 
-// ─── Chip ─────────────────────────────────────────────────────────────────────
+// ─── Chip ───────────────────────────────────────────────────────────────────────
 
 function Chip({ label, variant }: { label: string; variant: 'offer' | 'request' | 'match' }) {
   const bg = variant === 'offer' ? '#1f4642' : variant === 'request' ? '#FF8C42' : '#61d8cc';
@@ -118,7 +118,7 @@ function Chip({ label, variant }: { label: string; variant: 'offer' | 'request' 
   );
 }
 
-// ─── CompletionModal ──────────────────────────────────────────────────────────
+// ─── CompletionModal ──────────────────────────────────────────────────────────────
 
 function CompletionModal({
   visible, partner, currentUser, onClose, onSubmit,
@@ -160,10 +160,10 @@ function CompletionModal({
   if (!partner) return null;
 
   const checks: { key: keyof Omit<ProofField,'notes'>; label: string; desc: string; weight: string }[] = [
-    { key: 'deliveredOnTime',           label: 'Delivered on time',            desc: 'They finished when they promised.',          weight: '×0.35' },
-    { key: 'scopeMatchedAgreement',     label: 'Scope matched our agreement',  desc: 'They taught what we agreed on.',             weight: '×0.35' },
-    { key: 'portfolioEvidenceAttached', label: 'Evidence / portfolio attached', desc: 'There's a link or file proving the work.',  weight: '×0.15' },
-    { key: 'wouldSwapAgain',            label: 'Would swap again',              desc: 'Overall I'd recommend this person.',         weight: '×0.15' },
+    { key: 'deliveredOnTime',           label: 'Delivered on time',             desc: 'They finished when they promised.',           weight: '×0.35' },
+    { key: 'scopeMatchedAgreement',     label: 'Scope matched our agreement',   desc: 'They taught what we agreed on.',              weight: '×0.35' },
+    { key: 'portfolioEvidenceAttached', label: 'Evidence / portfolio attached',  desc: 'There’s a link or file proving the work.',   weight: '×0.15' },
+    { key: 'wouldSwapAgain',            label: 'Would swap again',               desc: 'Overall I’d recommend this person.',          weight: '×0.15' },
   ];
 
   return (
@@ -235,7 +235,7 @@ function CompletionModal({
   );
 }
 
-// ─── MatchCard ────────────────────────────────────────────────────────────────
+// ─── MatchCard ──────────────────────────────────────────────────────────────────
 // Lean card: no math panel, no dropdown. Just the essentials.
 // Full breakdown → /transaction/score-breakdown?userId=X
 
@@ -373,7 +373,7 @@ function MatchCard({
   );
 }
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
+// ─── Main Screen ──────────────────────────────────────────────────────────────────
 
 export default function MatchHub() {
   const { data: authUser } = useUser();
