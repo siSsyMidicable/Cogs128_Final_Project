@@ -35,16 +35,97 @@ const CARDS = [
     description: "Ensures fair and verified skill matches",
     tilt: "-0.8deg",
   },
+  {
+    id: "4",
+    title: "How It Works",
+    description: "List a skill → Browse skills you need → Request a swap",
+    tilt: "0.5deg",
+    isProcess: true,
+  },
 ];
+
+// ─── 3-Step Process Flow Component ───────────────────────────────────────────
+function ProcessFlow() {
+  const steps = [
+    {
+      number: "1",
+      label: "List a Skill",
+      sub: "Share what you can teach",
+      color: "#01696F",
+    },
+    {
+      number: "2",
+      label: "Browse Skills",
+      sub: "Find what you need",
+      color: "#01696F",
+    },
+    {
+      number: "3",
+      label: "Request a Swap",
+      sub: "Confirm & connect",
+      color: "#437A22",
+    },
+  ];
+
+  return (
+    <View style={processStyles.container}>
+      <Text style={processStyles.heading}>How SkillSwap Works</Text>
+      <Text style={processStyles.tagline}>
+        Offer first, then browse, then act.
+      </Text>
+
+      <View style={processStyles.stepsRow}>
+        {steps.map((step, index) => (
+          <React.Fragment key={step.number}>
+            {/* Step bubble */}
+            <View style={processStyles.stepItem}>
+              <View
+                style={[
+                  processStyles.stepCircle,
+                  { backgroundColor: step.color },
+                ]}
+              >
+                <Text style={processStyles.stepNumber}>{step.number}</Text>
+              </View>
+              <Text style={processStyles.stepLabel}>{step.label}</Text>
+              <Text style={processStyles.stepSub}>{step.sub}</Text>
+            </View>
+
+            {/* Arrow connector between steps */}
+            {index < steps.length - 1 && (
+              <View style={processStyles.arrowContainer}>
+                <Text style={processStyles.arrow}>›</Text>
+              </View>
+            )}
+          </React.Fragment>
+        ))}
+      </View>
+
+      {/* Offer → Browse → Request memory aid */}
+      <View style={processStyles.memoryRow}>
+        {["Offer", "Browse", "Request"].map((word, i) => (
+          <React.Fragment key={word}>
+            <View style={processStyles.chip}>
+              <Text style={processStyles.chipText}>{word}</Text>
+            </View>
+            {i < 2 && <Text style={processStyles.chipArrow}>→</Text>}
+          </React.Fragment>
+        ))}
+      </View>
+    </View>
+  );
+}
 
 function IntroCard({
   title,
   description,
   tilt,
+  isProcess,
 }: {
   title: string;
   description: string;
   tilt: string;
+  isProcess?: boolean;
 }) {
   return (
     <View style={[styles.cardWrapper, { width: CARD_WIDTH }]}>
@@ -52,21 +133,51 @@ function IntroCard({
         <View style={[styles.cardGlow, styles.cardGlowOne]} />
         <View style={[styles.cardGlow, styles.cardGlowTwo]} />
         <View style={[styles.infoCard, { transform: [{ rotate: tilt }] }]}>
-          <Text style={styles.cardTitle}>{title}</Text>
-          <Text style={styles.cardDescription}>{description}</Text>
+          {isProcess ? (
+            // Process card: show mini steps inline
+            <View>
+              <Text style={styles.cardTitle}>{title}</Text>
+              {[
+                { n: "1", t: "List a skill you offer" },
+                { n: "2", t: "Browse skills you need" },
+                { n: "3", t: "Request a swap" },
+              ].map((s) => (
+                <View key={s.n} style={cardProcessStyles.row}>
+                  <View style={cardProcessStyles.badge}>
+                    <Text style={cardProcessStyles.badgeText}>{s.n}</Text>
+                  </View>
+                  <Text style={cardProcessStyles.rowText}>{s.t}</Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <>
+              <Text style={styles.cardTitle}>{title}</Text>
+              <Text style={styles.cardDescription}>{description}</Text>
+            </>
+          )}
         </View>
       </View>
     </View>
   );
 }
 
-function DotIndicators({ count, activeIndex }: { count: number; activeIndex: number }) {
+function DotIndicators({
+  count,
+  activeIndex,
+}: {
+  count: number;
+  activeIndex: number;
+}) {
   return (
     <View style={styles.dotsRow}>
       {Array.from({ length: count }).map((_, i) => (
         <View
           key={i}
-          style={[styles.dot, i === activeIndex ? styles.dotActive : styles.dotInactive]}
+          style={[
+            styles.dot,
+            i === activeIndex ? styles.dotActive : styles.dotInactive,
+          ]}
         />
       ))}
     </View>
@@ -86,7 +197,9 @@ export default function IntroScreen() {
     []
   );
 
-  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 60,
+  }).current;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -125,6 +238,7 @@ export default function IntroScreen() {
                   title={item.title}
                   description={item.description}
                   tilt={item.tilt}
+                  isProcess={item.isProcess}
                 />
               )}
               onViewableItemsChanged={onViewableItemsChanged}
@@ -133,6 +247,9 @@ export default function IntroScreen() {
 
             <DotIndicators count={CARDS.length} activeIndex={activeIndex} />
           </View>
+
+          {/* 3-Step Process Flow */}
+          <ProcessFlow />
 
           {/* Skip Button */}
           <Pressable
@@ -156,6 +273,131 @@ export default function IntroScreen() {
   );
 }
 
+// ─── Process Flow Styles ──────────────────────────────────────────────────────
+const processStyles = StyleSheet.create({
+  container: {
+    width: "100%",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  heading: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#000",
+    marginBottom: 2,
+    letterSpacing: 0.3,
+  },
+  tagline: {
+    fontSize: 12,
+    color: "rgba(0,0,0,0.55)",
+    marginBottom: 14,
+  },
+  stepsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    marginBottom: 12,
+  },
+  stepItem: {
+    alignItems: "center",
+    width: 88,
+  },
+  stepCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  stepNumber: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#fff",
+  },
+  stepLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#000",
+    textAlign: "center",
+  },
+  stepSub: {
+    fontSize: 10,
+    color: "rgba(0,0,0,0.55)",
+    textAlign: "center",
+    marginTop: 2,
+  },
+  arrowContainer: {
+    paddingBottom: 20,
+  },
+  arrow: {
+    fontSize: 22,
+    color: "#01696F",
+    fontWeight: "900",
+  },
+  // Offer → Browse → Request memory chips
+  memoryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  chip: {
+    backgroundColor: "rgba(1,105,111,0.12)",
+    borderRadius: 99,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: "rgba(1,105,111,0.25)",
+  },
+  chipText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#01696F",
+  },
+  chipArrow: {
+    fontSize: 12,
+    color: "#01696F",
+    fontWeight: "700",
+  },
+});
+
+// ─── Card process mini-list styles ───────────────────────────────────────────
+const cardProcessStyles = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 10,
+  },
+  badge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#01696F",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#fff",
+  },
+  rowText: {
+    fontSize: 13,
+    color: "rgba(0,0,0,0.8)",
+    fontWeight: "500",
+    flex: 1,
+  },
+});
+
+// ─── Main Styles ──────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
