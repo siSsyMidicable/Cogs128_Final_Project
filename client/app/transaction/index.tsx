@@ -220,7 +220,6 @@ function CompletionModal({
   function handleSubmit() {
     if (!given.trim() || !received.trim() || starRating === 0) return;
     onSubmit(given.trim(), received.trim(), proof, starRating, reviewComment.trim());
-    // reset
     setGiven(''); setReceived(''); setStarRating(0); setReviewComment('');
     setProof({ deliveredOnTime: false, scopeMatchedAgreement: false,
                portfolioEvidenceAttached: false, wouldSwapAgain: false, notes: '' });
@@ -349,8 +348,6 @@ function CompletionModal({
 }
 
 // ─── MatchCard ─────────────────────────────────────────────────────────────────
-// Rec 3: action-specific labels
-// Rec 6: show aggregate star rating
 
 function MatchCard({
   user, currentUser, connections, completed, requests, request, connect, onComplete,
@@ -447,15 +444,272 @@ function MatchCard({
         <Text style={s.whyText}>{why}</Text>
       </View>
 
-            <View style={s.bars}>
+      <View style={s.bars}>
         <View style={s.barRow}>
           <Text style={s.barLabel}>Total</Text>
           <ScoreBar value={scores.total} color="#61d8cc" />
           <Text style={s.barVal}>{pct(scores.total)}</Text>
         </View>
       </View>
-  
-  
+
+      <Pressable style={[s.actionBtn, btnStyle]} onPress={btnAction}>
+        <SwapIcon size={15} color={isDone ? '#607876' : isConnected ? '#000' : '#000'} />
+        <Text style={[s.actionText, isDone && { color: '#607876' }]}>{btnLabel}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+// ─── EmptyState ────────────────────────────────────────────────────────────────
+// Rec 5
+
+function EmptyState({ query, category, onClear }: { query: string; category: Category; onClear: () => void }) {
+  return (
+    <View style={s.emptyWrap}>
+      <Text style={s.emptyEmoji}>🔍</Text>
+      <Text style={s.emptyTitle}>No matches found</Text>
+      <Text style={s.emptySub}>
+        {query
+          ? `No one matches "${query}"${category !== 'All' ? ` in ${category}` : ''}.`
+          : `No one in the "${category}" category yet.`}
+        {'\n'}Try a different search or category.
+      </Text>
+      <Pressable style={s.emptyBtn} onPress={onClear}>
+        <Text style={s.emptyBtnText}>Clear filters</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+// ─── Main screen ───────────────────────────────────────────────────────────────
+
+export default function TransactionScreen() {
+  const { user } = useUser();
+  const currentUser: MatchUser = user ?? YOU;
+
+  const {
+    connections, completed, requests,
+    requestSwap, connectSwap, completeSwap,
+  } = useMatchingState(currentUser);
+
+  // Rec 4: search + category
+  const [query, setQuery]       = useState('');
+  const [category, setCategory] = useState<Category>('All');
+
+  // Rec 6: completion modal
+  const [modalPartner, setModalPartner] = useState<MatchUser | null>(null);
+
+  const sorted = useMemo(() => {
+    return [...MOCK_USERS]
+      .filter(u => u.id !== currentUser.id)
+      .sort((a, b) => matchScore(currentUser, b).total - matchScore(currentUser, a).total);
+  }, [currentUser]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return sorted.filter(u => {
+      const matchesCat = userMatchesCategory(u, category);
+      if (!matchesCat) return false;
+      if (!q) return true;
+      return (
+        u.name.toLowerCase().includes(q) ||
+        u.offers.some(s => s.toLowerCase().includes(q)) ||
+        u.requests.some(s => s.toLowerCase().includes(q))
+      );
+    });
+  }, [sorted, query, category]);
+
+  // Rec 2: toast-wrapped actions
+  const handleRequest = useCallback((id: string) => {
+    toast.loading('Sending swap request…');
+    setTimeout(() => {
+      requestSwap(id);
+      toast.success('Swap requested!');
+    }, 600);
+  }, [requestSwap]);
+
+  const handleConnect = useCallback((id: string) => {
+    toast.loading('Accepting swap…');
+    setTimeout(() => {
+      connectSwap(id);
+      toast.success('Swap accepted — good luck!');
+    }, 600);
+  }, [connectSwap]);
+
+  const handleComplete = useCallback((
+    given: string, received: string, proof: ProofField,
+    starRating: number, reviewComment: string,
+  ) => {
+    if (!modalPartner) return;
+    toast.loading('Recording swap…');
+    setTimeout(() => {
+      completeSwap(modalPartner.id, given, received, proof, starRating, reviewComment);
+      setModalPartner(null);
+      toast.success('Swap completed and recorded!');
+    }, 700);
+  }, [completeSwap, modalPartner]);
+
+  return (
+    <SafeAreaView style={s.safe}>
+      <StatusBar barStyle="light-content" backgroundColor="#0f1919" />
+
+      {/* Header */}
+      <View style={s.header}>
+        <View style={s.headerLeft}>
+          <SwapIcon size={22} color="#61d8cc" />
+          <Text style={s.headerTitle}>Match Hub</Text>
+        </View>
+        <Pressable style={s.historyBtn} onPress={() => router.push('/history')}>
+          <HistoryIcon size={18} color="#61d8cc" />
+          <Text style={s.historyText}>History</Text>
+        </Pressable>
+      </View>
+
+      {/* Rec 4: Search bar */}
+      <View style={s.searchRow}>
+        <View style={s.searchBox}>
+          <SearchIcon size={15} color="#607876" />
+          <TextInput
+            style={s.searchInput}
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search by name or skill…"
+            placeholderTextColor="#607876"
+            clearButtonMode="while-editing"
+            returnKeyType="search"
+          />
+        </View>
+      </View>
+
+      {/* Rec 4: Category chips */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.catRow}
+      >
+        {CATEGORIES.map(cat => (
+          <Pressable
+            key={cat}
+            style={[s.catChip, category === cat && s.catChipActive]}
+            onPress={() => setCategory(cat)}
+          >
+            <Text style={[s.catChipText, category === cat && s.catChipTextActive]}>
+              {cat}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+
+      {/* List or empty state */}
+      {filtered.length === 0 ? (
+        <EmptyState
+          query={query}
+          category={category}
+          onClear={() => { setQuery(''); setCategory('All'); }}
+        />
+      ) : (
+        <FlatList
+          data={filtered}
+          keyExtractor={item => item.id}
+          renderItem={({ item }) => (
+            <MatchCard
+              user={item}
+              currentUser={currentUser}
+              connections={connections}
+              completed={completed}
+              requests={requests}
+              request={handleRequest}
+              connect={handleConnect}
+              onComplete={setModalPartner}
+            />
+          )}
+          contentContainerStyle={s.list}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
+
+      {/* Completion modal */}
+      <CompletionModal
+        visible={!!modalPartner}
+        partner={modalPartner}
+        currentUser={currentUser}
+        onClose={() => setModalPartner(null)}
+        onSubmit={handleComplete}
+      />
+    </SafeAreaView>
+  );
+}
+
+// ─── Styles ────────────────────────────────────────────────────────────────────
+
+const s = StyleSheet.create({
+  safe:           { flex: 1, backgroundColor: '#0f1919' },
+  header:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#1f3530' },
+  headerLeft:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerTitle:    { fontSize: 20, fontWeight: '900', color: '#e8f5f3', letterSpacing: 0.3 },
+  historyBtn:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: '#1f3530' },
+  historyText:    { fontSize: 13, color: '#61d8cc', fontWeight: '700' },
+
+  // Rec 4 search
+  searchRow:      { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
+  searchBox:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#131b1b', borderWidth: 1, borderColor: '#2f4a47', paddingHorizontal: 10, paddingVertical: 8, gap: 8 },
+  searchInput:    { flex: 1, fontSize: 14, color: '#e8f5f3' },
+
+  // Rec 4 category chips
+  catRow:         { paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
+  catChip:        { paddingHorizontal: 14, paddingVertical: 6, borderWidth: 1, borderColor: '#2f4a47', backgroundColor: '#131b1b' },
+  catChipActive:  { borderColor: '#61d8cc', backgroundColor: '#1f3530' },
+  catChipText:    { fontSize: 12, fontWeight: '700', color: '#607876' },
+  catChipTextActive: { color: '#61d8cc' },
+
+  list:           { padding: 16, gap: 16 },
+
+  // Rec 5 empty state
+  emptyWrap:      { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
+  emptyEmoji:     { fontSize: 48, marginBottom: 12 },
+  emptyTitle:     { fontSize: 18, fontWeight: '900', color: '#e8f5f3', marginBottom: 8 },
+  emptySub:       { fontSize: 13, color: '#607876', textAlign: 'center', lineHeight: 20, marginBottom: 20 },
+  emptyBtn:       { paddingHorizontal: 24, paddingVertical: 10, borderWidth: 1, borderColor: '#61d8cc' },
+  emptyBtnText:   { fontSize: 13, fontWeight: '700', color: '#61d8cc' },
+
+  // Card
+  card:           { backgroundColor: '#131b1b', borderWidth: 1, borderColor: '#1f3530', padding: 14 },
+  cardHeader:     { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 },
+  avatar:         { width: 44, height: 44, backgroundColor: '#1f3530', alignItems: 'center', justifyContent: 'center' },
+  avatarEmoji:    { fontSize: 22 },
+  nameRow:        { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 },
+  name:           { fontSize: 15, fontWeight: '800', color: '#e8f5f3' },
+  offersLine:     { fontSize: 11, color: '#607876', marginBottom: 3 },
+  saveBtn:        { padding: 6, marginRight: 4 },
+  badge:          { alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1.5 },
+  badgeEmoji:     { fontSize: 14 },
+  badgePct:       { fontSize: 12, fontWeight: '900' },
+
+  chipRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8, alignItems: 'center' },
+  chipRowLabel:   { fontSize: 10, fontWeight: '700', color: '#607876', letterSpacing: 0.8 },
+  chip:           { paddingHorizontal: 8, paddingVertical: 3 },
+  chipText:       { fontSize: 11, fontWeight: '700' },
+  noOverlap:      { fontSize: 11, color: '#607876', fontStyle: 'italic', marginBottom: 8 },
+
+  why:            { backgroundColor: '#0f1919', padding: 10, marginBottom: 10, borderLeftWidth: 2, borderLeftColor: '#1f3530' },
+  whyText:        { fontSize: 12, color: '#9ab5b2', lineHeight: 18 },
+
+  bars:           { marginBottom: 10, gap: 4 },
+  barRow:         { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  barLabel:       { fontSize: 10, color: '#607876', width: 38, fontWeight: '700' },
+  barTrack:       { flex: 1, height: 5, backgroundColor: '#1f3530' },
+  barFill:        { height: 5 },
+  barVal:         { fontSize: 10, color: '#607876', width: 32, textAlign: 'right' },
+
+  // Rec 3 action buttons
+  actionBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 11, borderWidth: 1.5 },
+  actionText:     { fontSize: 14, fontWeight: '800', color: '#000' },
+  requestBtn:     { backgroundColor: '#61d8cc', borderColor: '#1f4642' },
+  acceptBtn:      { backgroundColor: '#FFD166', borderColor: '#8a6800' },
+  connectedBtn:   { backgroundColor: '#4f98a3', borderColor: '#2f6670' },
+  doneBtn:        { backgroundColor: '#1f3530', borderColor: '#2f4a47' },
+});
+
 const modal = StyleSheet.create({
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
   sheet:        {
@@ -471,11 +725,9 @@ const modal = StyleSheet.create({
     backgroundColor: '#131b1b', borderWidth: 1, borderColor: '#2f4a47',
     color: '#fff', padding: 10, fontSize: 14,
   },
-  // Rec 6: star rating row
   starRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 },
   starLabel:    { fontSize: 14, fontWeight: '700', color: '#FFD166' },
   starHint:     { fontSize: 11, color: '#607876', fontStyle: 'italic', marginBottom: 4 },
-
   proofHeader:  {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#2f4a47', marginBottom: 4,
