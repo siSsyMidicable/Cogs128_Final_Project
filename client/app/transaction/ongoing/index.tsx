@@ -27,6 +27,7 @@ import {
   fairnessFromProof,
 } from '@/lib/matching/matching';
 import { MOCK_USERS, ACTIVE_SWAPS, type ActiveSwapMeta, YOU } from '@/lib/matching/data';
+import { toast } from '@/components/ui/toast';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental)
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -420,8 +421,12 @@ export default function OngoingScreen() {
         onClose={() => setCompletionTarget(null)}
         onSubmit={(given, received, proof) => {
           if (!completionTarget) return;
-          complete(completionTarget, YOU, given, received, proof);
-          setCompletionTarget(null);
+          toast.loading('Recording swap…');
+          setTimeout(() => {
+            complete(completionTarget, YOU, given, received, proof);
+            toast.success(`Swap with ${completionTarget.name} recorded! Check History for the full breakdown.`);
+            setCompletionTarget(null);
+          }, 500);
         }}
       />
     </SafeAreaView>

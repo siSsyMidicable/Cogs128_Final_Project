@@ -18,6 +18,7 @@ import Svg, { Path } from 'react-native-svg';
 import { router } from 'expo-router';
 import { useMatchingState, matchScore, whyThisMatch } from '@/lib/matching/matching';
 import { MOCK_USERS, YOU } from '@/lib/matching/data';
+import { toast } from '@/components/ui/toast';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -131,21 +132,31 @@ function RequestCard({
         <Text style={rc.whyText}>{why}</Text>
       </View>
 
-      {/* Actions */}
+      {/* Actions — Rec 2: toast feedback, Rec 3: action-specific labels */}
       <View style={rc.actions}>
         <Pressable
           style={rc.declineBtn}
-          onPress={onDecline}
-          accessibilityLabel={`Decline ${user.name}`}>
+          onPress={() => {
+            onDecline();
+            toast.info(`Swap request from ${user.name} declined.`);
+          }}
+          accessibilityLabel={`Decline swap request from ${user.name}`}>
           <DeclineIcon />
           <Text style={rc.declineBtnText}>Decline</Text>
         </Pressable>
         <Pressable
           style={rc.acceptBtn}
-          onPress={onAccept}
-          accessibilityLabel={`Accept ${user.name}`}>
+          onPress={() => {
+            toast.loading('Accepting swap…');
+            setTimeout(() => {
+              onAccept();
+              toast.success(`Swap accepted! ${user.name} is now in your Active Swaps.`);
+            }, 500);
+          }}
+          accessibilityLabel={`Accept swap request from ${user.name}`}>
           <AcceptIcon />
-          <Text style={rc.acceptBtnText}>Accept Match</Text>
+          {/* Rec 3: was "Accept Match" */}
+          <Text style={rc.acceptBtnText}>Accept Swap</Text>
         </Pressable>
       </View>
     </View>
@@ -176,10 +187,17 @@ export default function IncomingScreen() {
       </View>
 
       {pendingIds.length === 0 ? (
+        // Rec 5: designed empty state with primary action
         <View style={s.empty}>
           <Text style={s.emptyEmoji}>📭</Text>
-          <Text style={s.emptyTitle}>No pending requests</Text>
-          <Text style={s.emptySub}>When someone requests to swap with you, they'll appear here.</Text>
+          <Text style={s.emptyTitle}>No swap requests yet</Text>
+          <Text style={s.emptySub}>
+            When someone wants to swap skills with you, their request appears here.
+            Go find matches and send the first request!
+          </Text>
+          <Pressable style={s.emptyBtn} onPress={() => router.push('/transaction')}>
+            <Text style={s.emptyBtnText}>Browse Skill Matches</Text>
+          </Pressable>
         </View>
       ) : (
         <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
@@ -220,7 +238,13 @@ const s = StyleSheet.create({
   empty:        { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
   emptyEmoji:   { fontSize: 48 },
   emptyTitle:   { fontSize: 20, fontWeight: '800', color: '#101414' },
-  emptySub:     { fontSize: 14, color: '#394140', textAlign: 'center', lineHeight: 20 },
+  emptySub:     { fontSize: 14, color: '#394140', textAlign: 'center', lineHeight: 20, maxWidth: 300 },
+  emptyBtn:     {
+    marginTop: 12, backgroundColor: '#61d8cc',
+    borderWidth: 2, borderColor: '#1f4642',
+    paddingVertical: 12, paddingHorizontal: 24,
+  },
+  emptyBtnText: { fontSize: 14, fontWeight: '800', color: '#000' },
 });
 
 const rc = StyleSheet.create({

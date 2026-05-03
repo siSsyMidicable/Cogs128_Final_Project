@@ -22,6 +22,7 @@ import {
   LayoutAnimation,
   UIManager,
 } from 'react-native';
+import Svg, { Polygon } from 'react-native-svg';
 import { router } from 'expo-router';
 import {
   useHistoryState,
@@ -32,6 +33,29 @@ import {
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+// ─── StarDisplay ─────────────────────────────────────────────────────────────────
+
+function StarDisplay({ rating }: { rating: number }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+      {[1, 2, 3, 4, 5].map(n => (
+        <Svg key={n} width={14} height={14} viewBox="0 0 24 24" fill="none">
+          <Polygon
+            points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"
+            fill={n <= Math.round(rating) ? '#FFD166' : 'none'}
+            stroke={n <= Math.round(rating) ? '#8a6800' : '#607876'}
+            strokeWidth={1.75}
+            strokeLinejoin="round"
+          />
+        </Svg>
+      ))}
+      <Text style={{ fontSize: 12, color: '#FFD166', fontWeight: '700', marginLeft: 2 }}>
+        {rating.toFixed(1)}
+      </Text>
+    </View>
+  );
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -171,6 +195,17 @@ function HistoryCard({ record }: { record: HistoryRecord }) {
               <Text style={[s.tagText, t.startsWith('⚠') ? s.tagTextWarn : s.tagTextGood]}>{t}</Text>
             </View>
           ))}
+        </View>
+      )}
+
+      {/* Rec 6: Star rating + review comment */}
+      {record.starRating !== undefined && (
+        <View style={s.ratingBox}>
+          <Text style={s.ratingLabel}>YOUR RATING</Text>
+          <StarDisplay rating={record.starRating} />
+          {!!record.reviewComment && (
+            <Text style={s.reviewText}>"{record.reviewComment}"</Text>
+          )}
         </View>
       )}
 
@@ -388,6 +423,18 @@ const s = StyleSheet.create({
   tagText: { fontSize: 11, fontWeight: '700' },
   tagTextGood: { color: '#1f4642' },
   tagTextWarn: { color: '#7a5000' },
+
+  // Rec 6: rating box
+  ratingBox: {
+    backgroundColor: '#1f2e2b',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2f4a47',
+    gap: 4,
+  },
+  ratingLabel: { fontSize: 9, fontWeight: '700', color: '#607876', letterSpacing: 1, marginBottom: 2 },
+  reviewText:  { fontSize: 12, color: '#9ab5b2', fontStyle: 'italic', lineHeight: 18, marginTop: 4 },
 
   notesBox: {
     backgroundColor: '#e8ebe5',
