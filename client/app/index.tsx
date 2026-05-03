@@ -33,9 +33,9 @@ const CARDS = [
   },
   {
     id: "3",
-    title: "Proof, not stars",
+    title: "Ratings you can trust",
     description:
-      "Instead of a gameable star rating, you confirm 4 verifiable facts: delivered on time, scope matched, evidence attached, would swap again.",
+      "After every swap, both sides rate each other 1–5 stars. That aggregate score appears on every profile so you always know who you're swapping with.",
     tilt: "-0.8deg",
   },
   {
