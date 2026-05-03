@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { useCallback, useEffect, useState } from 'react';
+import { YOU } from '@/lib/matching/data';
+import type { MatchUser } from '@/lib/matching/matching';
 
 export const loginInputSchema = z.object({
   email: z.string().email(),
@@ -17,11 +19,8 @@ type LoginValues = {
   password: string;
 };
 
-type User = {
-  id: string;
-  name: string;
-  email: string;
-};
+// MatchUser superset — auth user always has offers/requests so matching never crashes
+export type User = MatchUser;
 
 let currentUser: User | null = null;
 const userListeners = new Set<(user: User | null) => void>();
@@ -41,7 +40,9 @@ export function useLogin() {
 
     await new Promise((r) => setTimeout(r, 300));
 
+    // Spread YOU's matching fields so offers/requests/etc. are always defined
     publishUser({
+      ...YOU,
       id: values.email,
       name: values.email.split('@')[0] || 'User',
       email: values.email,
