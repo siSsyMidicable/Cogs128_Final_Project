@@ -233,8 +233,8 @@ function CompletionModal({
   const checks: { key: keyof Omit<ProofField,'notes'>; label: string; desc: string; weight: string }[] = [
     { key: 'deliveredOnTime',           label: 'Delivered on time',             desc: 'They finished when they promised.',           weight: '×0.35' },
     { key: 'scopeMatchedAgreement',     label: 'Scope matched our agreement',   desc: 'They taught what we agreed on.',              weight: '×0.35' },
-    { key: 'portfolioEvidenceAttached', label: 'Evidence / portfolio attached',  desc: 'There's a link or file proving the work.',   weight: '×0.15' },
-    { key: 'wouldSwapAgain',            label: 'Would swap again',               desc: 'Overall I'd recommend this person.',          weight: '×0.15' },
+    { key: 'portfolioEvidenceAttached', label: 'Evidence / portfolio attached',  desc: 'There\'s a link or file proving the work.',   weight: '×0.15' },
+    { key: 'wouldSwapAgain',            label: 'Would swap again',               desc: 'Overall I\'d recommend this person.',          weight: '×0.15' },
   ];
 
   return (
