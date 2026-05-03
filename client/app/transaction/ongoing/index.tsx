@@ -19,7 +19,7 @@ import {
   SafeAreaView, StatusBar, TextInput, LayoutAnimation,
   Platform, UIManager, Modal,
 } from 'react-native';
-import Svg, { Path, Circle, Rect } from 'react-native-svg';
+import Svg, { Path, Circle, Rect, Polygon } from 'react-native-svg';
 import { router } from 'expo-router';
 import {
   useMatchingState,
@@ -100,7 +100,35 @@ function SendIcon({ size = 14, color = '#000' }: { size?: number; color?: string
   );
 }
 
-// ─── CompletionModal (self-contained copy so Ongoing works standalone) ─────────
+// ─── StarRating ───────────────────────────────────────────────────────────────
+
+function StarRating({
+  value, onChange, size = 28,
+}: {
+  value: number; onChange?: (v: number) => void; size?: number;
+}) {
+  return (
+    <View style={{ flexDirection: 'row', gap: 6 }}>
+      {[1, 2, 3, 4, 5].map(n => (
+        <Pressable key={n} onPress={() => onChange?.(n)}
+          accessibilityLabel={`Rate ${n} star${n !== 1 ? 's' : ''}`}
+          style={{ padding: 2 }}>
+          <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+            <Polygon
+              points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"
+              fill={n <= value ? '#FFD166' : 'none'}
+              stroke={n <= value ? '#8a6800' : '#607876'}
+              strokeWidth={1.75}
+              strokeLinejoin="round"
+            />
+          </Svg>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+// ─── CompletionModal ──────────────────────────────────────────────────────────
 
 function CompletionModal({
   visible, partner, onClose, onSubmit,
@@ -108,11 +136,13 @@ function CompletionModal({
   visible: boolean;
   partner: MatchUser | null;
   onClose: () => void;
-  onSubmit: (given: string, received: string, proof: ProofField) => void;
+  onSubmit: (given: string, received: string, proof: ProofField, starRating: number, reviewComment: string) => void;
 }) {
-  const [given, setGiven]       = useState('');
-  const [received, setReceived] = useState('');
-  const [proof, setProof]       = useState<ProofField>({
+  const [given, setGiven]             = useState('');
+  const [received, setReceived]       = useState('');
+  const [starRating, setStarRating]   = useState(0);
+  const [reviewComment, setReviewComment] = useState('');
+  const [proof, setProof]             = useState<ProofField>({
     deliveredOnTime: false, scopeMatchedAgreement: false,
     portfolioEvidenceAttached: false, wouldSwapAgain: false, notes: '',
   });
@@ -132,15 +162,18 @@ function CompletionModal({
 
   const fairness = fairnessFromProof(proof);
   const fairLabel =
-    fairness >= 0.85 ? 'Excellent — their trust score goes up.' :
+    fairness >= 0.85 ? 'Excellent \u2014 their trust score goes up.' :
     fairness >= 0.65 ? 'Good swap recorded.' :
-    fairness >= 0.35 ? 'Partial — some issues noted.' :
-    'Poor swap — trust score will reflect this.';
+    fairness >= 0.35 ? 'Partial \u2014 some issues noted.' :
+    'Poor swap \u2014 trust score will reflect this.';
+
+  const starLabel = ['', 'Poor', 'Fair', 'Good', 'Great', 'Excellent!'][starRating] ?? '';
+  const canSubmit = given.trim() && received.trim() && starRating > 0;
 
   function handleSubmit() {
-    if (!given.trim() || !received.trim()) return;
-    onSubmit(given.trim(), received.trim(), proof);
-    setGiven(''); setReceived('');
+    if (!canSubmit) return;
+    onSubmit(given.trim(), received.trim(), proof, starRating, reviewComment.trim());
+    setGiven(''); setReceived(''); setStarRating(0); setReviewComment('');
     setProof({ deliveredOnTime: false, scopeMatchedAgreement: false,
                portfolioEvidenceAttached: false, wouldSwapAgain: false, notes: '' });
   }
@@ -148,10 +181,10 @@ function CompletionModal({
   if (!partner) return null;
 
   const checks: { key: keyof Omit<ProofField,'notes'>; label: string; weight: string }[] = [
-    { key: 'deliveredOnTime',           label: 'Delivered on time',             weight: '×0.35' },
-    { key: 'scopeMatchedAgreement',     label: 'Scope matched agreement',       weight: '×0.35' },
-    { key: 'portfolioEvidenceAttached', label: 'Evidence / portfolio attached',  weight: '×0.15' },
-    { key: 'wouldSwapAgain',            label: 'Would swap again',               weight: '×0.15' },
+    { key: 'deliveredOnTime',           label: 'Delivered on time',             weight: '\u00d70.35' },
+    { key: 'scopeMatchedAgreement',     label: 'Scope matched agreement',       weight: '\u00d70.35' },
+    { key: 'portfolioEvidenceAttached', label: 'Evidence / portfolio attached',  weight: '\u00d70.15' },
+    { key: 'wouldSwapAgain',            label: 'Would swap again',               weight: '\u00d70.15' },
   ];
 
   return (
@@ -170,13 +203,37 @@ function CompletionModal({
             <Text style={mo.label}>Skill you received</Text>
             <TextInput style={mo.input} value={received} onChangeText={setReceived}
               placeholder="Graphic Design" placeholderTextColor="#607876" />
+
+            {/* Star rating */}
+            <Text style={mo.label}>Overall rating (required)</Text>
+            <View style={mo.starRow}>
+              <StarRating value={starRating} onChange={setStarRating} size={30} />
+              {starRating > 0 && (
+                <Text style={mo.starLabel}>{starLabel}</Text>
+              )}
+            </View>
+            {starRating === 0 && (
+              <Text style={mo.starHint}>Tap a star to rate {partner.name}\u2019s performance</Text>
+            )}
+
+            {/* Review comment */}
+            <Text style={mo.label}>Review (optional)</Text>
+            <TextInput
+              style={[mo.input, { height: 60, textAlignVertical: 'top' }]}
+              value={reviewComment}
+              onChangeText={setReviewComment}
+              placeholder={`What was it like swapping with ${partner.name}?`}
+              placeholderTextColor="#607876"
+              multiline
+            />
+
             <Text style={[mo.label, { marginTop: 16 }]}>How did it go?</Text>
             {checks.map(c => (
               <Pressable key={c.key}
                 style={[mo.check, proof[c.key] && mo.checkActive]}
                 onPress={() => toggle(c.key)}>
                 <View style={[mo.box, proof[c.key] && mo.boxChecked]}>
-                  {proof[c.key] && <Text style={mo.tick}>✓</Text>}
+                  {proof[c.key] && <Text style={mo.tick}>\u2713</Text>}
                 </View>
                 <Text style={mo.checkLabel}>{c.label}</Text>
                 <Text style={mo.checkWeight}>{c.weight}</Text>
@@ -195,17 +252,26 @@ function CompletionModal({
             <TextInput style={[mo.input, { height: 64, textAlignVertical: 'top' }]}
               value={proof.notes ?? ''}
               onChangeText={t => setProof(p => ({ ...p, notes: t }))}
-              placeholder="Links, context…" placeholderTextColor="#607876" multiline />
+              placeholder="Links, context\u2026" placeholderTextColor="#607876" multiline />
+
+            {!canSubmit && (
+              <Text style={mo.submitHint}>
+                {!given.trim() || !received.trim()
+                  ? '\u26a0 Enter the skills exchanged above to continue.'
+                  : '\u26a0 A star rating is required before submitting.'}
+              </Text>
+            )}
+
             <View style={mo.actions}>
               <Pressable style={mo.cancel} onPress={onClose}>
                 <Text style={mo.cancelText}>Cancel</Text>
               </Pressable>
               <Pressable
-                style={[mo.submit, (!given.trim() || !received.trim()) && mo.submitDis]}
+                style={[mo.submit, !canSubmit && mo.submitDis]}
                 onPress={handleSubmit}
-                disabled={!given.trim() || !received.trim()}>
+                disabled={!canSubmit}>
                 <SwapIcon size={15} color="#000" />
-                <Text style={mo.submitText}>Submit</Text>
+                <Text style={mo.submitText}>Submit Swap</Text>
               </Pressable>
             </View>
           </ScrollView>
@@ -241,9 +307,11 @@ function CheckInThread({
       {checkIns.map((c, i) => (
         <View key={i} style={[ct.bubble, c.fromMe ? ct.bubbleMe : ct.bubbleThem]}>
           <Text style={ct.bubbleMeta}>
-            {c.fromMe ? 'You' : 'Them'} · {formatDate(c.date)}
+            {c.fromMe ? 'You' : 'Them'} \u00b7 {formatDate(c.date)}
           </Text>
-          <Text style={ct.bubbleText}>{c.note}</Text>
+          <Text style={[ct.bubbleText, c.fromMe ? ct.bubbleTextMe : ct.bubbleTextThem]}>
+            {c.note}
+          </Text>
         </View>
       ))}
       {!open ? (
@@ -260,7 +328,7 @@ function CheckInThread({
             style={ct.input}
             value={input}
             onChangeText={setInput}
-            placeholder="Progress note…"
+            placeholder="Progress note\u2026"
             placeholderTextColor="#607876"
             multiline
             autoFocus
@@ -289,7 +357,6 @@ function SwapCard({
   const dCol  = deadlineColor(days);
   const urgency = days <= 1 ? 'DUE TODAY' : days <= 3 ? `${days} DAYS LEFT` : `${days} days left`;
 
-  // local check-in state (starts from seed)
   const [checkIns, setCheckIns] = useState<CheckIn[]>(meta.checkIns);
 
   function addCheckIn(note: string) {
@@ -310,7 +377,6 @@ function SwapCard({
           <Text style={sw.name}>{user.name}</Text>
           <Text style={sw.subline}>Active swap</Text>
         </View>
-        {/* Deadline badge */}
         <View style={[sw.deadline, { borderColor: dCol }]}>
           <ClockIcon size={11} color={dCol} />
           <Text style={[sw.deadlineText, { color: dCol }]}>{urgency}</Text>
@@ -368,7 +434,6 @@ export default function OngoingScreen() {
     <SafeAreaView style={s.safe}>
       <StatusBar barStyle="dark-content" />
 
-      {/* Nav */}
       <View style={s.nav}>
         <Pressable onPress={() => router.back()} style={s.navBack}>
           <BackIcon />
@@ -381,7 +446,7 @@ export default function OngoingScreen() {
 
       {activeUsers.length === 0 ? (
         <View style={s.empty}>
-          <Text style={s.emptyEmoji}>🤝</Text>
+          <Text style={s.emptyEmoji}>\ud83e\udd1d</Text>
           <Text style={s.emptyTitle}>No active swaps</Text>
           <Text style={s.emptySub}>
             Accept a match from the hub to start a swap.
@@ -399,7 +464,7 @@ export default function OngoingScreen() {
               userId: user.id,
               youGive: YOU.offers[0],
               theyGive: user.offers[0],
-              agreedScope: 'Scope not yet defined — add a check-in to document your agreement.',
+              agreedScope: 'Scope not yet defined \u2014 add a check-in to document your agreement.',
               deadlineIso: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
               checkIns: [],
             };
@@ -419,11 +484,11 @@ export default function OngoingScreen() {
         visible={completionTarget !== null}
         partner={completionTarget}
         onClose={() => setCompletionTarget(null)}
-        onSubmit={(given, received, proof) => {
+        onSubmit={(given, received, proof, starRating, reviewComment) => {
           if (!completionTarget) return;
-          toast.loading('Recording swap…');
+          toast.loading('Recording swap\u2026');
           setTimeout(() => {
-            complete(completionTarget, YOU, given, received, proof);
+            complete(completionTarget, YOU, given, received, proof, starRating, reviewComment);
             toast.success(`Swap with ${completionTarget.name} recorded! Check History for the full breakdown.`);
             setCompletionTarget(null);
           }, 500);
@@ -515,7 +580,9 @@ const ct = StyleSheet.create({
   bubbleMe:     { backgroundColor: '#1f4642', alignSelf: 'flex-end' },
   bubbleThem:   { backgroundColor: '#e8ebe5', alignSelf: 'flex-start', borderWidth: 1, borderColor: '#d0d2ce' },
   bubbleMeta:   { fontSize: 10, color: '#9ab5b2', marginBottom: 3 },
-  bubbleText:   { fontSize: 13, color: '#fff', lineHeight: 18 },
+  bubbleText:   { fontSize: 13, lineHeight: 18 },
+  bubbleTextMe:   { color: '#fff' },
+  bubbleTextThem: { color: '#2f3333' },
   addBtn:       {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     borderWidth: 1, borderColor: '#2f3333', borderStyle: 'dashed',
@@ -540,7 +607,7 @@ const mo = StyleSheet.create({
   sheet:        {
     backgroundColor: '#1c2424', borderTopWidth: 2, borderTopColor: '#61d8cc',
     borderTopLeftRadius: 16, borderTopRightRadius: 16,
-    padding: 20, maxHeight: '88%',
+    padding: 20, maxHeight: '92%',
   },
   handle:       { width: 40, height: 4, backgroundColor: '#607876', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   titleRow:     { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
@@ -550,6 +617,9 @@ const mo = StyleSheet.create({
     backgroundColor: '#131b1b', borderWidth: 1, borderColor: '#2f4a47',
     color: '#fff', padding: 10, fontSize: 14,
   },
+  starRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 },
+  starLabel:    { fontSize: 14, fontWeight: '700', color: '#FFD166' },
+  starHint:     { fontSize: 11, color: '#607876', fontStyle: 'italic', marginBottom: 4 },
   check:        {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     padding: 12, borderWidth: 1, borderColor: '#2f4a47',
@@ -568,6 +638,7 @@ const mo = StyleSheet.create({
   fairLabel:    { fontSize: 10, fontWeight: '700', color: '#a8c5c2', marginBottom: 2 },
   fairVal:      { fontSize: 28, fontWeight: '900', marginBottom: 2 },
   fairBlurb:    { fontSize: 12, color: '#607876' },
+  submitHint:   { fontSize: 12, color: '#FFD166', marginTop: 4, marginBottom: 2, textAlign: 'center' },
   actions:      { flexDirection: 'row', gap: 10, marginTop: 10, marginBottom: 24 },
   cancel:       { flex: 1, padding: 14, borderWidth: 2, borderColor: '#2f4a47', alignItems: 'center' },
   cancelText:   { fontSize: 14, fontWeight: '700', color: '#607876' },
