@@ -254,6 +254,17 @@ export default function IntroScreen() {
           {/* 3-Step Process Flow */}
           <ProcessFlow />
 
+          <Pressable
+            onPress={() => router.push("/atelier")}
+            style={({ pressed }) => [
+              styles.atelierLink,
+              pressed && { opacity: 0.85 },
+            ]}
+            accessibilityLabel="Preview Atelier redesign on separate branch"
+          >
+            <Text style={styles.atelierLinkText}>Preview: Atelier redesign →</Text>
+          </Pressable>
+
           {/* CTA Button — Rec 1 & 3: action-specific label */}
           <Pressable
             onPress={() => router.replace("/auth/login")}
@@ -539,6 +550,19 @@ const styles = StyleSheet.create({
   },
 
   // Skip button
+  atelierLink: {
+    width: "100%",
+    maxWidth: 280,
+    alignItems: "center",
+    paddingVertical: 12,
+    marginBottom: 10,
+  },
+  atelierLinkText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#01696F",
+    textDecorationLine: "underline",
+  },
   skipButtonContainer: {
     width: "100%",
     maxWidth: 240,
