@@ -3,9 +3,9 @@ import { ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "react-native-paper";
 import Svg, { Path, Circle } from 'react-native-svg';
 
-import { AppAvatar } from "@/components/ui/avatar";
-import { Buttons } from "@/components/ui/button";
-import { useConfirmationDialog } from "@/components/ui/dialog";
+import  AppAvatar from "@/components/ui/avatar";
+import Buttons  from "@/components/ui/button";
+import useConfirmationDialog  from "@/components/ui/dialog";
 import { Remarks } from "@/features/remark/components/remarks";
 import { MonthlyTransactionsChart } from "@/features/statistic/components/monthly-transactions-chart";
 import { TrendingServicesChart } from "@/features/statistic/components/trending-services-chart";
