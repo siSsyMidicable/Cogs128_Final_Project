@@ -233,8 +233,8 @@ function CompletionModal({
   const checks: { key: keyof Omit<ProofField,'notes'>; label: string; desc: string; weight: string }[] = [
     { key: 'deliveredOnTime',           label: 'Delivered on time',             desc: 'They finished when they promised.',           weight: '×0.35' },
     { key: 'scopeMatchedAgreement',     label: 'Scope matched our agreement',   desc: 'They taught what we agreed on.',              weight: '×0.35' },
-    { key: 'portfolioEvidenceAttached', label: 'Evidence / portfolio attached',  desc: 'There\'s a link or file proving the work.',   weight: '×0.15' },
-    { key: 'wouldSwapAgain',            label: 'Would swap again',               desc: 'Overall I\'d recommend this person.',          weight: '×0.15' },
+    { key: 'portfolioEvidenceAttached', label: 'Evidence / portfolio attached',  desc: "There's a link or file proving the work.",   weight: '×0.15' },
+    { key: 'wouldSwapAgain',            label: 'Would swap again',               desc: "Overall I'd recommend this person.",          weight: '×0.15' },
   ];
 
   return (
@@ -369,484 +369,93 @@ function MatchCard({
   const isRequested = requests.has(user.id);
   const isDone      = completed.has(user.id);
 
-  const youCover  = currentUser.offers.filter(s => user.requests.includes(s));
-  const theyCover = user.offers.filter(s => currentUser.requests.includes(s));
+  const rating = averageStarRating(user);
+  const count  = swapCount(user);
 
-  // Rec 6: live aggregate rating for this user
-  const avgRating = averageStarRating(user.id);
-  const numSwaps  = swapCount(user.id);
+  let btnLabel = 'Request a Swap';
+  let btnStyle = s.requestBtn;
+  let btnAction = () => request(user.id);
 
-  // Rec 2 & Rec 3: action handlers with toast feedback
-  function handleRequest() {
-    toast.loading('Sending swap request…');
-    setTimeout(() => {
-      request(user.id);
-      toast.success(`Swap requested! You'll be notified when ${user.name} responds.`);
-    }, 600);
+  if (isDone) {
+    btnLabel = 'Swap Completed';
+    btnStyle = s.doneBtn;
+    btnAction = () => {};
+  } else if (isConnected) {
+    btnLabel = 'Swap In Progress';
+    btnStyle = s.connectedBtn;
+    btnAction = () => onComplete(user);
+  } else if (isRequested) {
+    btnLabel = 'Accept Swap';
+    btnStyle = s.acceptBtn;
+    btnAction = () => connect(user.id);
   }
 
-  function handleAccept() {
-    toast.loading('Accepting swap…');
-    setTimeout(() => {
-      connect(user.id);
-      toast.success(`Swap accepted! ${user.name} is now in your Active Swaps.`);
-    }, 500);
-  }
+  const overlaps = useMemo(() => {
+    const off = user.offers.filter(o => currentUser.requests.includes(o));
+    const req = user.requests.filter(r => currentUser.offers.includes(r));
+    return { off, req };
+  }, [user, currentUser]);
 
   return (
     <View style={s.card}>
-      {/* ── Header ── */}
       <View style={s.cardHeader}>
-        <View style={s.avatar}><Text style={s.avatarEmoji}>{user.avatar}</Text></View>
+        <View style={[s.avatar, { borderRadius: 22 }]}>
+          <Text style={s.avatarEmoji}>{user.emoji ?? '🙂'}</Text>
+        </View>
+
         <View style={{ flex: 1, marginLeft: 10 }}>
           <View style={s.nameRow}>
             <Text style={s.name}>{user.name}</Text>
-            <VerifiedIcon size={13} color="#4f98a3" />
+            {user.verified && <VerifiedIcon />}
           </View>
-          <Text style={s.offersLine} numberOfLines={1}>Offers: {user.offers.join(', ')}</Text>
-          {/* Rec 6: avg rating row */}
-          {avgRating !== null && (
-            <View style={{ marginTop: 3 }}>
-              <StarDisplay rating={avgRating} count={numSwaps} />
-            </View>
-          )}
+
+          <Text style={s.offersLine} numberOfLines={1}>
+            Offers: {user.offers.join(', ')}
+          </Text>
+
+          {count > 0 && <StarDisplay rating={rating} count={count} />}
         </View>
-        <Pressable onPress={() => setSaved(v => !v)} style={s.saveBtn}
-          accessibilityLabel={saved ? 'Unsave' : 'Save'}>
-          <SaveIcon size={18} color={saved ? '#61d8cc' : '#394140'} filled={saved} />
+
+        <Pressable
+          style={s.saveBtn}
+          onPress={() => {
+            LayoutAnimation.easeInEaseOut();
+            setSaved(v => !v);
+          }}
+          accessibilityLabel={saved ? 'Unsave match' : 'Save match'}
+        >
+          <SaveIcon filled={saved} color={saved ? '#61d8cc' : '#394140'} />
         </Pressable>
-        {/* Score badge */}
+
         <View style={[s.badge, { borderColor: v.color }]}>
           <Text style={s.badgeEmoji}>{v.emoji}</Text>
           <Text style={[s.badgePct, { color: v.color }]}>{pct(scores.total)}</Text>
         </View>
       </View>
 
-      {/* ── Skill overlap chips ── */}
-      {theyCover.length > 0 && (
+      {(overlaps.off.length > 0 || overlaps.req.length > 0) ? (
         <View style={s.chipRow}>
-          <Text style={s.chipRowLabel}>✓ They teach what you need: </Text>
-          {theyCover.map(sk => <Chip key={sk} label={sk} variant="match" />)}
+          <Text style={s.chipRowLabel}>Match:</Text>
+          {overlaps.off.map(sk => <Chip key={sk} label={sk} variant="offer" />)}
+          {overlaps.req.map(sk => <Chip key={sk} label={sk} variant="request" />)}
         </View>
-      )}
-      {youCover.length > 0 && (
-        <View style={s.chipRow}>
-          <Text style={s.chipRowLabel}>✓ You teach what they need: </Text>
-          {youCover.map(sk => <Chip key={sk} label={sk} variant="offer" />)}
-        </View>
-      )}
-      {theyCover.length === 0 && youCover.length === 0 && (
-        <Text style={s.noOverlap}>— No direct skill overlap</Text>
+      ) : (
+        <Text style={s.noOverlap}>No direct skill overlap — indirect value match</Text>
       )}
 
-      {/* ── Why this match ── */}
       <View style={s.why}>
         <Text style={s.whyText}>{why}</Text>
       </View>
 
-      {/* ── Score bars ── */}
-      <View style={s.bars}>
+            <View style={s.bars}>
         <View style={s.barRow}>
-          <Text style={s.barLabel}>Skill Fit</Text>
-          <ScoreBar value={scores.sf} color="#61d8cc" />
-          <Text style={s.barVal}>{pct(scores.sf)}</Text>
-        </View>
-        <View style={s.barRow}>
-          <Text style={s.barLabel}>Trust    </Text>
-          <ScoreBar value={scores.tc} color="#4f98a3" />
-          <Text style={s.barVal}>{pct(scores.tc)}</Text>
-        </View>
-        <View style={s.barRow}>
-          <Text style={s.barLabel}>Match    </Text>
-          <ScoreBar value={scores.total} color={v.color} />
+          <Text style={s.barLabel}>Total</Text>
+          <ScoreBar value={scores.total} color="#61d8cc" />
           <Text style={s.barVal}>{pct(scores.total)}</Text>
         </View>
       </View>
-
-      {/* ── Score breakdown link ── */}
-      <Pressable
-        style={s.infoLink}
-        onPress={() => router.push(`/transaction/score-breakdown?userId=${user.id}`)}
-        accessibilityLabel={`See how ${user.name}'s score was calculated`}
-      >
-        <Text style={s.infoLinkText}>ℹ  How was {pct(scores.total)} calculated?</Text>
-      </Pressable>
-
-      {/* ── Actions (Rec 3: action-specific labels) ── */}
-      <View style={s.actionRow}>
-        {isDone ? (
-          <View style={[s.btn, s.doneBtn]}>
-            <Text style={s.btnText}>✓ Swap Completed</Text>
-          </View>
-        ) : isConnected ? (
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <View style={[s.btn, s.connectedBtn, { flex: 1 }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <SwapIcon size={16} color="#1f4642" />
-                {/* Rec 3 */}
-                <Text style={s.btnText}>Swap In Progress</Text>
-              </View>
-            </View>
-            <Pressable style={[s.btn, s.completeBtn, { flex: 1 }]} onPress={() => onComplete(user)}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <SwapIcon size={16} color="#000" />
-                <Text style={s.btnText}>Complete Swap</Text>
-              </View>
-            </Pressable>
-          </View>
-        ) : isRequested ? (
-          // Rec 3: was "Accept Match"
-          <Pressable style={[s.btn, s.acceptBtn]} onPress={handleAccept}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <SwapIcon size={16} color="#000" />
-              <Text style={s.btnText}>Accept Swap</Text>
-            </View>
-          </Pressable>
-        ) : (
-          // Rec 3: was "Request Match"
-          <Pressable style={[s.btn, s.requestBtn]} onPress={handleRequest}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <SwapIcon size={16} color="#000" />
-              <Text style={s.btnText}>Request a Swap</Text>
-            </View>
-          </Pressable>
-        )}
-      </View>
-    </View>
-  );
-}
-
-// ─── EmptySearchState (Rec 5) ──────────────────────────────────────────────────
-
-function EmptySearchState({ query, category, onClear }: { query: string; category: Category; onClear: () => void }) {
-  const reason = query && category !== 'All'
-    ? `"${query}" in ${category}`
-    : query
-    ? `"${query}"`
-    : category !== 'All'
-    ? `the ${category} category`
-    : 'your current filters';
-
-  return (
-    <View style={s.emptySearch}>
-      <Text style={s.emptySearchEmoji}>🔍</Text>
-      <Text style={s.emptySearchTitle}>No matches found for {reason}</Text>
-      <Text style={s.emptySearchSub}>
-        Try a different search term or category — or be the first to list that skill!
-      </Text>
-      <Pressable style={s.emptySearchBtn} onPress={onClear}>
-        <Text style={s.emptySearchBtnText}>Clear Filters</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-// ─── Main Screen ───────────────────────────────────────────────────────────────
-
-export default function MatchHub() {
-  const { data: authUser } = useUser();
-  const { connections, requests, completed, request, connect, complete } = useMatchingState();
-  const [completionTarget, setCompletionTarget] = useState<MatchUser | null>(null);
-
-  // Rec 4: search + category state
-  const [searchQuery, setSearchQuery]   = useState('');
-  const [activeCategory, setActiveCategory] = useState<Category>('All');
-
-  const sortedUsers = useMemo(
-    () => [...MOCK_USERS]
-      .map(u => ({ user: u, score: matchScore(YOU, u).total }))
-      .sort((a, b) => b.score - a.score)
-      .map(({ user }) => user),
-    [],
-  );
-
-  // Rec 4: apply search + category filter
-  const filteredUsers = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    return sortedUsers.filter(u => {
-      const matchesCategory = userMatchesCategory(u, activeCategory);
-      const matchesSearch = !q ||
-        u.name.toLowerCase().includes(q) ||
-        u.offers.some(s => s.toLowerCase().includes(q)) ||
-        u.requests.some(s => s.toLowerCase().includes(q));
-      return matchesCategory && matchesSearch;
-    });
-  }, [sortedUsers, searchQuery, activeCategory]);
-
-  const pending = MOCK_USERS.length - connections.size - requests.size - completed.size;
-
-  // Rec 2: complete with toast feedback
-  function handleComplete(partner: MatchUser, given: string, received: string, proof: ProofField, starRating: number, reviewComment: string) {
-    toast.loading('Recording swap…');
-    setTimeout(() => {
-      complete(partner, YOU, given, received, proof, starRating, reviewComment);
-      toast.success(`Swap with ${partner.name} recorded! Check your History for the full breakdown.`);
-    }, 500);
-  }
-
-  return (
-    <SafeAreaView style={s.safe}>
-      <StatusBar barStyle="dark-content" />
-
-      <View style={s.header}>
-        <View>
-          <Text style={s.eyebrow}>SKILLSWAP</Text>
-          <Text style={s.headerTitle}>Skill Matches</Text>
-          {authUser && <Text style={s.headerSub}>Signed in as {authUser.name}</Text>}
-        </View>
-        <View style={{ alignItems: 'flex-end', gap: 8 }}>
-          <View style={s.statsRow}>
-            <View style={s.statBox}>
-              <Text style={[s.statNum, { color: '#61d8cc' }]}>{connections.size}</Text>
-              <Text style={s.statLabel}>Connected</Text>
-            </View>
-            <View style={s.statDivider} />
-            <View style={s.statBox}>
-              <Text style={[s.statNum, { color: '#FF8C42' }]}>{requests.size}</Text>
-              <Text style={s.statLabel}>Requested</Text>
-            </View>
-            <View style={s.statDivider} />
-            <View style={s.statBox}>
-              <Text style={[s.statNum, { color: '#FFD166' }]}>{pending}</Text>
-              <Text style={s.statLabel}>Pending</Text>
-            </View>
-          </View>
-          <Pressable style={s.historyBtn} onPress={() => router.push('/transaction/history')}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <HistoryIcon size={14} color="#61d8cc" />
-              <Text style={s.historyBtnText}>History ({completed.size})</Text>
-            </View>
-          </Pressable>
-        </View>
-      </View>
-
-      {/* Your skills strip */}
-      <View style={s.yourProfile}>
-        <Text style={s.yourProfileTitle}>Your Skills</Text>
-        <View style={s.chipRowPlain}>
-          <Text style={s.chipGroupLabel}>Offers  </Text>
-          {YOU.offers.map(sk => <Chip key={sk} label={sk} variant="offer" />)}
-        </View>
-        <View style={[s.chipRowPlain, { marginTop: 6 }]}>
-          <Text style={s.chipGroupLabel}>Wants   </Text>
-          {YOU.requests.map(sk => <Chip key={sk} label={sk} variant="request" />)}
-        </View>
-      </View>
-
-      {/* Rec 4: Search bar */}
-      <View style={s.searchBar}>
-        <SearchIcon size={16} color="#607876" />
-        <TextInput
-          style={s.searchInput}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder="Search by name or skill…"
-          placeholderTextColor="#607876"
-          returnKeyType="search"
-          clearButtonMode="while-editing"
-          accessibilityLabel="Search matches by name or skill"
-        />
-        {searchQuery.length > 0 && (
-          <Pressable onPress={() => setSearchQuery('')} style={s.searchClear}
-            accessibilityLabel="Clear search">
-            <Text style={s.searchClearText}>✕</Text>
-          </Pressable>
-        )}
-      </View>
-
-      {/* Rec 4: Category filter chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={s.filterRow}
-        style={s.filterScroll}
-      >
-        {CATEGORIES.map(cat => (
-          <Pressable
-            key={cat}
-            style={[s.filterChip, activeCategory === cat && s.filterChipActive]}
-            onPress={() => setActiveCategory(cat)}
-            accessibilityLabel={`Filter by ${cat}`}
-          >
-            <Text style={[s.filterChipText, activeCategory === cat && s.filterChipTextActive]}>
-              {cat}
-            </Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-
-      {/* Rec 4+5: result count or empty state */}
-      {filteredUsers.length === 0 ? (
-        <EmptySearchState
-          query={searchQuery}
-          category={activeCategory}
-          onClear={() => { setSearchQuery(''); setActiveCategory('All'); }}
-        />
-      ) : (
-        <>
-          {(searchQuery || activeCategory !== 'All') && (
-            <Text style={s.resultCount}>
-              {filteredUsers.length} result{filteredUsers.length !== 1 ? 's' : ''}
-              {activeCategory !== 'All' ? ` in ${activeCategory}` : ''}
-              {searchQuery ? ` for "${searchQuery}"` : ''}
-            </Text>
-          )}
-          <FlatList
-            data={filteredUsers}
-            keyExtractor={u => u.id}
-            renderItem={({ item }) => (
-              <MatchCard
-                user={item} currentUser={YOU}
-                connections={connections} completed={completed} requests={requests}
-                request={request} connect={connect}
-                onComplete={p => setCompletionTarget(p)}
-              />
-            )}
-            contentContainerStyle={s.list}
-            showsVerticalScrollIndicator={false}
-          />
-        </>
-      )}
-
-      <CompletionModal
-        visible={completionTarget !== null} partner={completionTarget}
-        currentUser={YOU} onClose={() => setCompletionTarget(null)}
-        onSubmit={(given, received, proof, starRating, reviewComment) => {
-          if (!completionTarget) return;
-          handleComplete(completionTarget, given, received, proof, starRating, reviewComment);
-          setCompletionTarget(null);
-        }}
-      />
-    </SafeAreaView>
-  );
-}
-
-// ─── Styles ────────────────────────────────────────────────────────────────────
-
-const s = StyleSheet.create({
-  safe:         { flex: 1, backgroundColor: '#d6d8d3' },
-  header:       {
-    backgroundColor: '#ececea', borderBottomWidth: 2, borderBottomColor: '#2f3333',
-    paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
-  },
-  eyebrow:      { fontSize: 11, fontWeight: '700', color: '#434948', letterSpacing: 1.4 },
-  headerTitle:  { fontSize: 24, fontWeight: '800', color: '#101414' },
-  headerSub:    { fontSize: 12, color: '#394140', marginTop: 2 },
-  statsRow:     { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  statBox:      { alignItems: 'center', minWidth: 52 },
-  statNum:      { fontSize: 22, fontWeight: '800' },
-  statLabel:    { fontSize: 10, color: '#434948', fontWeight: '600', letterSpacing: 0.4 },
-  statDivider:  { width: 1, height: 28, backgroundColor: '#2f3333', marginHorizontal: 6 },
-  historyBtn:   { backgroundColor: '#2f3333', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 3 },
-  historyBtnText: { fontSize: 12, fontWeight: '800', color: '#61d8cc' },
-  yourProfile:  {
-    backgroundColor: '#f3f4f1', borderBottomWidth: 2, borderBottomColor: '#2f3333',
-    paddingHorizontal: 16, paddingVertical: 10,
-  },
-  yourProfileTitle: { fontSize: 11, fontWeight: '700', color: '#434948', letterSpacing: 1.2, marginBottom: 6 },
-  chipRowPlain: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
-  chipGroupLabel: { fontSize: 11, fontWeight: '700', color: '#2f3333', width: 44 },
-
-  // Rec 4: search bar
-  searchBar:    {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#f3f4f1', borderBottomWidth: 1, borderBottomColor: '#d0d2ce',
-    paddingHorizontal: 14, paddingVertical: 8,
-  },
-  searchInput:  {
-    flex: 1, fontSize: 14, color: '#101414', height: 36,
-    backgroundColor: '#e8ebe5', borderWidth: 1, borderColor: '#d0d2ce',
-    borderRadius: 4, paddingHorizontal: 10,
-  },
-  searchClear:  { padding: 4 },
-  searchClearText: { fontSize: 13, color: '#607876', fontWeight: '700' },
-
-  // Rec 4: category filter
-  filterScroll: { maxHeight: 44, backgroundColor: '#f3f4f1', borderBottomWidth: 1, borderBottomColor: '#d0d2ce' },
-  filterRow:    { paddingHorizontal: 12, paddingVertical: 6, gap: 8, alignItems: 'center' },
-  filterChip:   {
-    borderRadius: 4, paddingHorizontal: 12, paddingVertical: 6,
-    borderWidth: 1.5, borderColor: '#d0d2ce', backgroundColor: '#e8ebe5',
-  },
-  filterChipActive: { backgroundColor: '#1f4642', borderColor: '#61d8cc' },
-  filterChipText:   { fontSize: 12, fontWeight: '700', color: '#394140' },
-  filterChipTextActive: { color: '#61d8cc' },
-
-  resultCount:  { fontSize: 12, color: '#607876', paddingHorizontal: 16, paddingTop: 8, fontStyle: 'italic' },
-
-  list:         { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 32, gap: 14 },
-  card:         {
-    backgroundColor: '#f3f4f1', borderWidth: 2, borderColor: '#2f3333',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.14, shadowRadius: 8, elevation: 4,
-  },
-  cardHeader:   {
-    flexDirection: 'row', alignItems: 'center', padding: 12,
-    borderBottomWidth: 1, borderBottomColor: '#d0d2ce',
-  },
-  nameRow:      { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 2 },
-  avatar:       {
-    width: 44, height: 44, backgroundColor: '#61d8cc',
-    borderWidth: 2, borderColor: '#1f4642',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  avatarEmoji:  { fontSize: 22 },
-  name:         { fontSize: 17, fontWeight: '800', color: '#101414' },
-  offersLine:   { fontSize: 12, color: '#394140', marginTop: 1 },
-  saveBtn:      { padding: 6, marginRight: 4 },
-  badge:        {
-    borderWidth: 2, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 4,
-    alignItems: 'center', minWidth: 54,
-  },
-  badgeEmoji:   { fontSize: 13, marginBottom: 1 },
-  badgePct:     { fontSize: 14, fontWeight: '900' },
-  chipRow:      {
-    flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center',
-    paddingHorizontal: 12, paddingTop: 8, gap: 4,
-  },
-  chipRowLabel: { fontSize: 12, fontWeight: '700', color: '#2a8780' },
-  chip:         { borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3 },
-  chipText:     { fontSize: 12, fontWeight: '700' },
-  noOverlap:    { fontSize: 12, color: '#888', paddingHorizontal: 12, paddingTop: 8, fontStyle: 'italic' },
-  why:          {
-    backgroundColor: '#e8ebe5', borderTopWidth: 1, borderTopColor: '#d0d2ce',
-    paddingHorizontal: 12, paddingVertical: 8, marginTop: 4,
-  },
-  whyText:      { fontSize: 13, color: '#2f3333', lineHeight: 19 },
-  bars:         { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 4, gap: 6 },
-  barRow:       { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  barLabel:     { fontSize: 11, fontWeight: '700', color: '#2f3333', width: 58 },
-  barTrack:     { flex: 1, height: 7, backgroundColor: '#d0d2ce', borderRadius: 2, overflow: 'hidden' },
-  barFill:      { height: '100%', borderRadius: 2 },
-  barVal:       { fontSize: 11, fontWeight: '700', color: '#2f3333', width: 34, textAlign: 'right' },
-  infoLink:     {
-    borderTopWidth: 1, borderTopColor: '#d0d2ce',
-    paddingVertical: 8, paddingHorizontal: 12,
-    backgroundColor: '#e8ebe5',
-  },
-  infoLinkText: { fontSize: 12, fontWeight: '700', color: '#1f4642' },
-  actionRow:    { borderTopWidth: 1, borderTopColor: '#d0d2ce', padding: 10 },
-  btn:          { paddingVertical: 11, alignItems: 'center', borderWidth: 2, flex: 1 },
-  btnText:      { fontSize: 15, fontWeight: '800', color: '#000' },
-  requestBtn:   { backgroundColor: '#61d8cc', borderColor: '#1f4642' },
-  acceptBtn:    { backgroundColor: '#FF8C42', borderColor: '#7a3a10' },
-  connectedBtn: { backgroundColor: '#d0f0ec', borderColor: '#2a8780' },
-  completeBtn:  { backgroundColor: '#FFD166', borderColor: '#8a6800' },
-  doneBtn:      { backgroundColor: '#e8ebe5', borderColor: '#999' },
-
-  // Rec 5: empty search state
-  emptySearch:      { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 12 },
-  emptySearchEmoji: { fontSize: 48 },
-  emptySearchTitle: { fontSize: 18, fontWeight: '800', color: '#101414', textAlign: 'center' },
-  emptySearchSub:   { fontSize: 14, color: '#607876', textAlign: 'center', lineHeight: 22, maxWidth: 300 },
-  emptySearchBtn:   {
-    backgroundColor: '#61d8cc', borderWidth: 2, borderColor: '#1f4642',
-    paddingVertical: 12, paddingHorizontal: 24, marginTop: 4,
-  },
-  emptySearchBtnText: { fontSize: 14, fontWeight: '800', color: '#000' },
-});
-
+  
+  
 const modal = StyleSheet.create({
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
   sheet:        {
