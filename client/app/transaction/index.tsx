@@ -1,12 +1,5 @@
 /**
  * SkillSwap — Match Hub  (index.tsx)
- *
- * Report recommendations implemented here:
- *   Rec 2 — Toast feedback (loading / success / error) on every swap action
- *   Rec 3 — Action-specific button labels: "Request a Swap", "Accept Swap", "Swap In Progress"
- *   Rec 4 — Text search + category filter chips
- *   Rec 5 — Designed empty state when search/filter returns no results
- *   Rec 6 — 1–5 star rating + review comment in CompletionModal; avg rating shown on cards
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -28,7 +21,7 @@ import { toast } from '@/components/ui/toast';
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental)
   UIManager.setLayoutAnimationEnabledExperimental(true);
 
-// ─── Skill categories ──────────────────────────────────────────────────────────
+// ─── Skill categories ─────────────────────────────────────────────────────────
 
 const CATEGORIES = ['All', 'Tech', 'Creative', 'Life Skills', 'Finance'] as const;
 type Category = typeof CATEGORIES[number];
@@ -47,7 +40,7 @@ function userMatchesCategory(user: MatchUser, cat: Category): boolean {
          user.requests.some(s => catSkills.includes(s));
 }
 
-// ─── tiny helpers ───────────────────────────────────────────────────────────────
+// ─── tiny helpers ───────────────────────────────────────────────────────────
 
 function pct(v: number) { return `${Math.round(v * 100)}%`; }
 
@@ -58,7 +51,7 @@ function verdict(v: number) {
   return           { emoji: '⚠️', label: 'Weak',       color: '#EF767A' };
 }
 
-// ─── icons ──────────────────────────────────────────────────────────────────────
+// ─── icons ─────────────────────────────────────────────────────────────────────
 
 function SwapIcon({ size = 18, color = '#000' }: { size?: number; color?: string }) {
   return (
@@ -119,7 +112,7 @@ function TransparencyIcon({ size = 15, color = '#a8c5c2' }: { size?: number; col
   );
 }
 
-// ─── StarRating ─────────────────────────────────────────────────────────────────
+// ─── StarRating ────────────────────────────────────────────────────────────────
 
 function StarRating({
   value, onChange, size = 28,
@@ -147,7 +140,6 @@ function StarRating({
   );
 }
 
-/** Compact display-only star row shown on match cards */
 function StarDisplay({ rating, count }: { rating: number; count: number }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -159,7 +151,7 @@ function StarDisplay({ rating, count }: { rating: number; count: number }) {
   );
 }
 
-// ─── ScoreBar ──────────────────────────────────────────────────────────────────
+// ─── ScoreBar ────────────────────────────────────────────────────────────────
 
 function ScoreBar({ value, color }: { value: number; color: string }) {
   return (
@@ -169,7 +161,7 @@ function ScoreBar({ value, color }: { value: number; color: string }) {
   );
 }
 
-// ─── Chip ──────────────────────────────────────────────────────────────────────
+// ─── Chip ────────────────────────────────────────────────────────────────────
 
 function Chip({ label, variant }: { label: string; variant: 'offer' | 'request' | 'match' }) {
   const bg = variant === 'offer' ? '#1f4642' : variant === 'request' ? '#FF8C42' : '#61d8cc';
@@ -181,8 +173,7 @@ function Chip({ label, variant }: { label: string; variant: 'offer' | 'request' 
   );
 }
 
-// ─── CompletionModal ───────────────────────────────────────────────────────────
-// Rec 6: added 1–5 star rating + review comment
+// ─── CompletionModal ──────────────────────────────────────────────────────────
 
 function CompletionModal({
   visible, partner, currentUser, onClose, onSubmit,
@@ -250,7 +241,6 @@ function CompletionModal({
           </Text>
           <ScrollView showsVerticalScrollIndicator={false}>
 
-            {/* ── Skills exchanged ── */}
             <Text style={modal.fieldLabel}>Skill you gave</Text>
             <TextInput style={modal.input} value={given} onChangeText={setGiven}
               placeholder={currentUser.offers[0] ?? 'e.g. Web Dev'} placeholderTextColor="#607876" />
@@ -258,19 +248,15 @@ function CompletionModal({
             <TextInput style={modal.input} value={received} onChangeText={setReceived}
               placeholder={partner.offers[0] ?? 'e.g. Graphic Design'} placeholderTextColor="#607876" />
 
-            {/* ── Rec 6: Star rating ── */}
             <Text style={modal.fieldLabel}>Overall rating (required)</Text>
             <View style={modal.starRow}>
               <StarRating value={starRating} onChange={setStarRating} size={32} />
-              {starRating > 0 && (
-                <Text style={modal.starLabel}>{starLabel}</Text>
-              )}
+              {starRating > 0 && <Text style={modal.starLabel}>{starLabel}</Text>}
             </View>
             {starRating === 0 && (
               <Text style={modal.starHint}>Tap a star to rate {partner.name}'s performance</Text>
             )}
 
-            {/* ── Rec 6: Review comment ── */}
             <Text style={modal.fieldLabel}>Review (optional)</Text>
             <TextInput
               style={[modal.input, { height: 64, textAlignVertical: 'top' }]}
@@ -281,7 +267,6 @@ function CompletionModal({
               multiline
             />
 
-            {/* ── Proof checkboxes ── */}
             <View style={modal.proofHeader}>
               <TransparencyIcon size={15} color="#a8c5c2" />
               <Text style={[modal.fieldLabel, { marginTop: 0, marginLeft: 6, marginBottom: 0 }]}>Transparency proof</Text>
@@ -301,7 +286,6 @@ function CompletionModal({
               </Pressable>
             ))}
 
-            {/* ── Fairness preview ── */}
             <View style={[modal.fairRow, { borderColor: fairness >= 0.65 ? '#61d8cc' : fairness >= 0.35 ? '#FFD166' : '#EF767A' }]}>
               <View style={{ flex: 1 }}>
                 <Text style={modal.fairTitle}>Fairness score</Text>
@@ -317,7 +301,6 @@ function CompletionModal({
               value={proof.notes} onChangeText={t => setProof(p => ({ ...p, notes: t }))}
               placeholder="Context, evidence links…" placeholderTextColor="#607876" multiline />
 
-            {/* ── Submit hint ── */}
             {!canSubmit && (
               <Text style={modal.submitHint}>
                 {!given.trim() || !received.trim()
@@ -347,7 +330,7 @@ function CompletionModal({
   );
 }
 
-// ─── MatchCard ─────────────────────────────────────────────────────────────────
+// ─── MatchCard ─────────────────────────────────────────────────────────────
 
 function MatchCard({
   user, currentUser, connections, completed, requests, request, connect, onComplete,
@@ -366,8 +349,9 @@ function MatchCard({
   const isRequested = requests.has(user.id);
   const isDone      = completed.has(user.id);
 
-  const rating = averageStarRating(user);
-  const count  = swapCount(user);
+  // FIX: pass user.id (string) not user (MatchUser) — these functions take a partnerId
+  const rating = averageStarRating(user.id);
+  const count  = swapCount(user.id);
 
   let btnLabel = 'Request a Swap';
   let btnStyle = s.requestBtn;
@@ -397,20 +381,20 @@ function MatchCard({
     <View style={s.card}>
       <View style={s.cardHeader}>
         <View style={[s.avatar, { borderRadius: 22 }]}>
-          <Text style={s.avatarEmoji}>{user.emoji ?? '🙂'}</Text>
+          <Text style={s.avatarEmoji}>{(user as any).emoji ?? '🙂'}</Text>
         </View>
 
         <View style={{ flex: 1, marginLeft: 10 }}>
           <View style={s.nameRow}>
             <Text style={s.name}>{user.name}</Text>
-            {user.verified && <VerifiedIcon />}
+            {user.verified > 0 && <VerifiedIcon />}
           </View>
 
           <Text style={s.offersLine} numberOfLines={1}>
             Offers: {user.offers.join(', ')}
           </Text>
 
-          {count > 0 && <StarDisplay rating={rating} count={count} />}
+          {rating !== null && count > 0 && <StarDisplay rating={rating} count={count} />}
         </View>
 
         <Pressable
@@ -453,15 +437,14 @@ function MatchCard({
       </View>
 
       <Pressable style={[s.actionBtn, btnStyle]} onPress={btnAction}>
-        <SwapIcon size={15} color={isDone ? '#607876' : isConnected ? '#000' : '#000'} />
+        <SwapIcon size={15} color={isDone ? '#607876' : '#000'} />
         <Text style={[s.actionText, isDone && { color: '#607876' }]}>{btnLabel}</Text>
       </Pressable>
     </View>
   );
 }
 
-// ─── EmptyState ────────────────────────────────────────────────────────────────
-// Rec 5
+// ─── EmptyState ─────────────────────────────────────────────────────────────
 
 function EmptyState({ query, category, onClear }: { query: string; category: Category; onClear: () => void }) {
   return (
@@ -481,7 +464,7 @@ function EmptyState({ query, category, onClear }: { query: string; category: Cat
   );
 }
 
-// ─── Main screen ───────────────────────────────────────────────────────────────
+// ─── Main screen ────────────────────────────────────────────────────────────
 
 export default function TransactionScreen() {
   const { user } = useUser();
@@ -489,14 +472,13 @@ export default function TransactionScreen() {
 
   const {
     connections, completed, requests,
-    requestSwap, connectSwap, completeSwap,
-  } = useMatchingState(currentUser);
+    request: requestSwap,
+    connect: connectSwap,
+    complete,   // FIX: was destructured as "completeSwap" which doesn't exist
+  } = useMatchingState();
 
-  // Rec 4: search + category
   const [query, setQuery]       = useState('');
   const [category, setCategory] = useState<Category>('All');
-
-  // Rec 6: completion modal
   const [modalPartner, setModalPartner] = useState<MatchUser | null>(null);
 
   const sorted = useMemo(() => {
@@ -508,8 +490,7 @@ export default function TransactionScreen() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return sorted.filter(u => {
-      const matchesCat = userMatchesCategory(u, category);
-      if (!matchesCat) return false;
+      if (!userMatchesCategory(u, category)) return false;
       if (!q) return true;
       return (
         u.name.toLowerCase().includes(q) ||
@@ -519,23 +500,17 @@ export default function TransactionScreen() {
     });
   }, [sorted, query, category]);
 
-  // Rec 2: toast-wrapped actions
   const handleRequest = useCallback((id: string) => {
     toast.loading('Sending swap request…');
-    setTimeout(() => {
-      requestSwap(id);
-      toast.success('Swap requested!');
-    }, 600);
+    setTimeout(() => { requestSwap(id); toast.success('Swap requested!'); }, 600);
   }, [requestSwap]);
 
   const handleConnect = useCallback((id: string) => {
     toast.loading('Accepting swap…');
-    setTimeout(() => {
-      connectSwap(id);
-      toast.success('Swap accepted — good luck!');
-    }, 600);
+    setTimeout(() => { connectSwap(id); toast.success('Swap accepted — good luck!'); }, 600);
   }, [connectSwap]);
 
+  // FIX: use complete() with correct args (partner object + currentUser + given + received + proof + starRating + reviewComment)
   const handleComplete = useCallback((
     given: string, received: string, proof: ProofField,
     starRating: number, reviewComment: string,
@@ -543,29 +518,28 @@ export default function TransactionScreen() {
     if (!modalPartner) return;
     toast.loading('Recording swap…');
     setTimeout(() => {
-      completeSwap(modalPartner.id, given, received, proof, starRating, reviewComment);
+      complete(modalPartner, currentUser, given, received, proof, starRating, reviewComment);
       setModalPartner(null);
       toast.success('Swap completed and recorded!');
     }, 700);
-  }, [completeSwap, modalPartner]);
+  }, [complete, modalPartner, currentUser]);
 
   return (
     <SafeAreaView style={s.safe}>
       <StatusBar barStyle="light-content" backgroundColor="#0f1919" />
 
-      {/* Header */}
       <View style={s.header}>
         <View style={s.headerLeft}>
           <SwapIcon size={22} color="#61d8cc" />
           <Text style={s.headerTitle}>Match Hub</Text>
         </View>
-        <Pressable style={s.historyBtn} onPress={() => router.push('/history')}>
+        {/* FIX: correct route — history lives at /transaction/history */}
+        <Pressable style={s.historyBtn} onPress={() => router.push('/transaction/history')}>
           <HistoryIcon size={18} color="#61d8cc" />
           <Text style={s.historyText}>History</Text>
         </Pressable>
       </View>
 
-      {/* Rec 4: Search bar */}
       <View style={s.searchRow}>
         <View style={s.searchBox}>
           <SearchIcon size={15} color="#607876" />
@@ -581,7 +555,6 @@ export default function TransactionScreen() {
         </View>
       </View>
 
-      {/* Rec 4: Category chips */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -593,14 +566,11 @@ export default function TransactionScreen() {
             style={[s.catChip, category === cat && s.catChipActive]}
             onPress={() => setCategory(cat)}
           >
-            <Text style={[s.catChipText, category === cat && s.catChipTextActive]}>
-              {cat}
-            </Text>
+            <Text style={[s.catChipText, category === cat && s.catChipTextActive]}>{cat}</Text>
           </Pressable>
         ))}
       </ScrollView>
 
-      {/* List or empty state */}
       {filtered.length === 0 ? (
         <EmptyState
           query={query}
@@ -628,7 +598,6 @@ export default function TransactionScreen() {
         />
       )}
 
-      {/* Completion modal */}
       <CompletionModal
         visible={!!modalPartner}
         partner={modalPartner}
@@ -640,7 +609,7 @@ export default function TransactionScreen() {
   );
 }
 
-// ─── Styles ────────────────────────────────────────────────────────────────────
+// ─── Styles ──────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
   safe:           { flex: 1, backgroundColor: '#0f1919' },
@@ -649,30 +618,21 @@ const s = StyleSheet.create({
   headerTitle:    { fontSize: 20, fontWeight: '900', color: '#e8f5f3', letterSpacing: 0.3 },
   historyBtn:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: '#1f3530' },
   historyText:    { fontSize: 13, color: '#61d8cc', fontWeight: '700' },
-
-  // Rec 4 search
   searchRow:      { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
   searchBox:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#131b1b', borderWidth: 1, borderColor: '#2f4a47', paddingHorizontal: 10, paddingVertical: 8, gap: 8 },
   searchInput:    { flex: 1, fontSize: 14, color: '#e8f5f3' },
-
-  // Rec 4 category chips
   catRow:         { paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
   catChip:        { paddingHorizontal: 14, paddingVertical: 6, borderWidth: 1, borderColor: '#2f4a47', backgroundColor: '#131b1b' },
   catChipActive:  { borderColor: '#61d8cc', backgroundColor: '#1f3530' },
   catChipText:    { fontSize: 12, fontWeight: '700', color: '#607876' },
   catChipTextActive: { color: '#61d8cc' },
-
   list:           { padding: 16, gap: 16 },
-
-  // Rec 5 empty state
   emptyWrap:      { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
   emptyEmoji:     { fontSize: 48, marginBottom: 12 },
   emptyTitle:     { fontSize: 18, fontWeight: '900', color: '#e8f5f3', marginBottom: 8 },
   emptySub:       { fontSize: 13, color: '#607876', textAlign: 'center', lineHeight: 20, marginBottom: 20 },
   emptyBtn:       { paddingHorizontal: 24, paddingVertical: 10, borderWidth: 1, borderColor: '#61d8cc' },
   emptyBtnText:   { fontSize: 13, fontWeight: '700', color: '#61d8cc' },
-
-  // Card
   card:           { backgroundColor: '#131b1b', borderWidth: 1, borderColor: '#1f3530', padding: 14 },
   cardHeader:     { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 },
   avatar:         { width: 44, height: 44, backgroundColor: '#1f3530', alignItems: 'center', justifyContent: 'center' },
@@ -684,24 +644,19 @@ const s = StyleSheet.create({
   badge:          { alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1.5 },
   badgeEmoji:     { fontSize: 14 },
   badgePct:       { fontSize: 12, fontWeight: '900' },
-
   chipRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8, alignItems: 'center' },
   chipRowLabel:   { fontSize: 10, fontWeight: '700', color: '#607876', letterSpacing: 0.8 },
   chip:           { paddingHorizontal: 8, paddingVertical: 3 },
   chipText:       { fontSize: 11, fontWeight: '700' },
   noOverlap:      { fontSize: 11, color: '#607876', fontStyle: 'italic', marginBottom: 8 },
-
   why:            { backgroundColor: '#0f1919', padding: 10, marginBottom: 10, borderLeftWidth: 2, borderLeftColor: '#1f3530' },
   whyText:        { fontSize: 12, color: '#9ab5b2', lineHeight: 18 },
-
   bars:           { marginBottom: 10, gap: 4 },
   barRow:         { flexDirection: 'row', alignItems: 'center', gap: 8 },
   barLabel:       { fontSize: 10, color: '#607876', width: 38, fontWeight: '700' },
   barTrack:       { flex: 1, height: 5, backgroundColor: '#1f3530' },
   barFill:        { height: 5 },
   barVal:         { fontSize: 10, color: '#607876', width: 32, textAlign: 'right' },
-
-  // Rec 3 action buttons
   actionBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 11, borderWidth: 1.5 },
   actionText:     { fontSize: 14, fontWeight: '800', color: '#000' },
   requestBtn:     { backgroundColor: '#61d8cc', borderColor: '#1f4642' },
@@ -712,31 +667,19 @@ const s = StyleSheet.create({
 
 const modal = StyleSheet.create({
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
-  sheet:        {
-    backgroundColor: '#1c2424', borderTopWidth: 2, borderTopColor: '#61d8cc',
-    borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, maxHeight: '92%',
-  },
+  sheet:        { backgroundColor: '#1c2424', borderTopWidth: 2, borderTopColor: '#61d8cc', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, maxHeight: '92%' },
   handle:       { width: 40, height: 4, backgroundColor: '#607876', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   titleRow:     { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6 },
   title:        { fontSize: 18, fontWeight: '900', color: '#61d8cc' },
   subtitle:     { fontSize: 12, color: '#9ab5b2', marginBottom: 16, lineHeight: 18 },
   fieldLabel:   { fontSize: 11, fontWeight: '700', color: '#a8c5c2', letterSpacing: 0.8, marginBottom: 6, marginTop: 16 },
-  input:        {
-    backgroundColor: '#131b1b', borderWidth: 1, borderColor: '#2f4a47',
-    color: '#fff', padding: 10, fontSize: 14,
-  },
+  input:        { backgroundColor: '#131b1b', borderWidth: 1, borderColor: '#2f4a47', color: '#fff', padding: 10, fontSize: 14 },
   starRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 },
   starLabel:    { fontSize: 14, fontWeight: '700', color: '#FFD166' },
   starHint:     { fontSize: 11, color: '#607876', fontStyle: 'italic', marginBottom: 4 },
-  proofHeader:  {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#2f4a47', marginBottom: 4,
-  },
+  proofHeader:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#2f4a47', marginBottom: 4 },
   proofSub:     { fontSize: 11, color: '#607876', fontStyle: 'italic', marginBottom: 10 },
-  checkRow:     {
-    flexDirection: 'row', alignItems: 'center', padding: 12, marginBottom: 6,
-    borderWidth: 1, borderColor: '#2f4a47', backgroundColor: '#131b1b', gap: 10,
-  },
+  checkRow:     { flexDirection: 'row', alignItems: 'center', padding: 12, marginBottom: 6, borderWidth: 1, borderColor: '#2f4a47', backgroundColor: '#131b1b', gap: 10 },
   checkRowActive: { borderColor: '#61d8cc', backgroundColor: '#1f3530' },
   checkbox:     { width: 22, height: 22, borderWidth: 2, borderColor: '#607876', alignItems: 'center', justifyContent: 'center' },
   checkboxChecked: { borderColor: '#61d8cc', backgroundColor: '#61d8cc' },
@@ -744,10 +687,7 @@ const modal = StyleSheet.create({
   checkLabel:   { fontSize: 14, color: '#ccc', fontWeight: '700' },
   checkDesc:    { fontSize: 11, color: '#607876', marginTop: 1 },
   checkWeight:  { fontSize: 11, color: '#607876' },
-  fairRow:      {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#131b1b', borderWidth: 2, padding: 12, marginVertical: 12,
-  },
+  fairRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#131b1b', borderWidth: 2, padding: 12, marginVertical: 12 },
   fairTitle:    { fontSize: 11, fontWeight: '700', color: '#a8c5c2', marginBottom: 3 },
   fairBlurb:    { fontSize: 12, color: '#607876' },
   fairValue:    { fontSize: 28, fontWeight: '900' },
