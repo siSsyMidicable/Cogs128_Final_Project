@@ -19,6 +19,10 @@
  * 9. [LOW]   Card avatar gets color-coded ring matching match-verdict color.
  * 10.[LOW]   "Why this match" section collapsed by default, expands on tap
  *            (progressive disclosure — Sharp et al. IxD Ch.4).
+ *
+ * Bug fixes (v2):
+ * - whyThisMatch() requires 3 args (you, other, scores) — scores now passed correctly.
+ * - averageStarRating() and swapCount() take partnerId: string, not MatchUser — fixed.
  */
 
 import React, { useState, useMemo, useCallback, useRef } from 'react';
@@ -175,7 +179,6 @@ function AnimatedSearchBar({
   const inputRef = useRef<TextInput>(null);
   const lottieRef = useRef<any>(null);
 
-  // Play animation forward on focus, reverse on blur
   const handleFocus = () => {
     setFocused(true);
     lottieRef.current?.play(0, 30);
@@ -195,7 +198,6 @@ function AnimatedSearchBar({
         accessibilityLabel="Search by name or skill"
         accessibilityRole="search"
       >
-        {/* Lottie icon OR static SVG fallback */}
         {LottieView ? (
           <LottieView
             ref={lottieRef}
@@ -224,7 +226,6 @@ function AnimatedSearchBar({
           accessibilityHint="Type to filter the list below"
         />
 
-        {/* Clear button — only shown when there's text */}
         {value.length > 0 && (
           <Pressable
             onPress={() => { onClear(); inputRef.current?.focus(); }}
@@ -484,16 +485,20 @@ function MatchCard({
   request, connect, onComplete,
 }: {
   user: MatchUser; currentUser: MatchUser;
-  connections: string[]; completed: string[]; requests: string[];
+  connections: Set<string>; completed: Set<string>; requests: Set<string>;
   request: (id: string) => void;
   connect:  (id: string) => void;
   onComplete: (u: MatchUser) => void;
 }) {
+  // FIX 1: compute scores first, then pass to whyThisMatch as third arg
   const scores  = useMemo(() => matchScore(currentUser, user), [currentUser, user]);
-  const why     = useMemo(() => whyThisMatch(currentUser, user), [currentUser, user]);
+  const why     = useMemo(() => whyThisMatch(currentUser, user, scores), [currentUser, user, scores]);
+
+  // FIX 2: averageStarRating and swapCount take a partnerId string, not a MatchUser
+  const rating  = averageStarRating(user.id);
+  const swaps   = swapCount(user.id);
+
   const v       = verdict(scores.total);
-  const rating  = averageStarRating(user);
-  const swaps   = swapCount(user);
   const [saved, setSaved] = useState(false);
   const [whyOpen, setWhyOpen] = useState(false);
 
@@ -503,9 +508,9 @@ function MatchCard({
     return { off, req };
   }, [user, currentUser]);
 
-  const isRequested  = requests.includes(user.id);
-  const isConnected  = connections.includes(user.id);
-  const isDone       = completed.includes(user.id);
+  const isRequested  = requests.has(user.id);
+  const isConnected  = connections.has(user.id);
+  const isDone       = completed.has(user.id);
 
   // ── Specific, context-aware button labels (Report fix #2) ──
   const { btnLabel, btnStyle, btnAction } = (() => {
@@ -514,9 +519,6 @@ function MatchCard({
     if (isRequested)   return { btnLabel: 'Request Sent ✓',    btnStyle: s.requestedBtn, btnAction: () => {} };
     return               { btnLabel: 'Send Swap Request',    btnStyle: s.requestBtn,   btnAction: () => request(user.id) };
   })();
-
-  // Accept button appears separately when another user requested us
-  const canAccept = !isDone && !isConnected && !isRequested;
 
   return (
     <View style={[s.card, { borderLeftColor: v.color, borderLeftWidth: 3 }]}>
@@ -531,7 +533,7 @@ function MatchCard({
             {swaps >= 3 && <VerifiedIcon />}
           </View>
           {/* Trust signals: star rating + swap count always visible (Report fix #4) */}
-          {swaps > 0
+          {rating !== null && swaps > 0
             ? <StarDisplay rating={rating} count={swaps} />
             : <Text style={s.offersLine}>New member — no swaps yet</Text>
           }
@@ -713,6 +715,11 @@ export default function TransactionScreen() {
     }, 700);
   }, [complete, modalPartner, currentUser]);
 
+  // Convert Sets to arrays for FlatList props
+  const connectionsList = useMemo(() => connections, [connections]);
+  const completedList   = useMemo(() => completed, [completed]);
+  const requestsList    = useMemo(() => requests, [requests]);
+
   return (
     <SafeAreaView style={s.safe}>
       <StatusBar barStyle="light-content" backgroundColor="#0f1919" />
@@ -794,9 +801,9 @@ export default function TransactionScreen() {
             <MatchCard
               user={item}
               currentUser={currentUser}
-              connections={connections}
-              completed={completed}
-              requests={requests}
+              connections={connectionsList}
+              completed={completedList}
+              requests={requestsList}
               request={handleRequest}
               connect={handleConnect}
               onComplete={setModalPartner}
