@@ -9,7 +9,7 @@
  * is never empty on first load.
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   Pressable, SafeAreaView, StatusBar,
@@ -84,6 +84,7 @@ function RequestCard({
   const user   = MOCK_USERS.find(u => u.id === userId);
   if (!user) return null;
 
+  const [detailOpen, setDetailOpen] = useState(false);
   const scores  = useMemo(() => matchScore(YOU, user), [user]);
   const v       = verdict(scores.total);
   const why     = useMemo(() => whyThisMatch(YOU, user, scores), [user, scores]);
@@ -93,46 +94,49 @@ function RequestCard({
 
   return (
     <View style={rc.card}>
-      {/* Header */}
       <View style={rc.header}>
         <View style={rc.avatar}><Text style={rc.avatarEmoji}>{user.avatar}</Text></View>
-        <View style={{ flex: 1, marginLeft: 10 }}>
+        <View style={rc.headerMain}>
           <View style={rc.nameRow}>
             <Text style={rc.name}>{user.name}</Text>
             {user.verified > 0 && <VerifiedIcon color="#4f98a3" />}
           </View>
+          <Text style={rc.matchLine}>{pct(scores.total)} · {v.label}</Text>
           <Text style={rc.offers} numberOfLines={1}>{user.offers.join(', ')}</Text>
-        </View>
-        <View style={[rc.badge, { borderColor: v.color }]}>
-          <Text style={rc.badgeEmoji}>{v.emoji}</Text>
-          <Text style={[rc.badgePct, { color: v.color }]}>{pct(scores.total)}</Text>
         </View>
       </View>
 
-      {/* What you'd exchange */}
       {(theyGive.length > 0 || youGive.length > 0) && (
         <View style={rc.exchange}>
           {theyGive.length > 0 && (
-            <Text style={rc.exchangeText}>
-              <Text style={rc.exchangeAccent}>They give you: </Text>
+            <Text style={rc.exchangeText} numberOfLines={2}>
+              <Text style={rc.exchangeAccent}>They offer </Text>
               {theyGive.join(', ')}
             </Text>
           )}
           {youGive.length > 0 && (
-            <Text style={rc.exchangeText}>
-              <Text style={rc.exchangeAccent}>You give them: </Text>
+            <Text style={rc.exchangeText} numberOfLines={2}>
+              <Text style={rc.exchangeAccent}>You offer </Text>
               {youGive.join(', ')}
             </Text>
           )}
         </View>
       )}
 
-      {/* Why sentence */}
-      <View style={rc.why}>
-        <Text style={rc.whyText}>{why}</Text>
-      </View>
+      <Pressable
+        style={rc.detailToggle}
+        onPress={() => setDetailOpen(o => !o)}
+        accessibilityRole="button"
+        accessibilityLabel={detailOpen ? 'Hide why this match' : 'Why this match'}
+      >
+        <Text style={rc.detailToggleText}>{detailOpen ? 'Hide details' : 'Why this match'}</Text>
+      </Pressable>
+      {detailOpen && (
+        <View style={rc.why}>
+          <Text style={rc.whyText}>{why}</Text>
+        </View>
+      )}
 
-      {/* Actions — Rec 2: toast feedback, Rec 3: action-specific labels */}
       <View style={rc.actions}>
         <Pressable
           style={rc.declineBtn}
@@ -155,8 +159,7 @@ function RequestCard({
           }}
           accessibilityLabel={`Accept swap request from ${user.name}`}>
           <AcceptIcon />
-          {/* Rec 3: was "Accept Match" */}
-          <Text style={rc.acceptBtnText}>Accept Swap</Text>
+          <Text style={rc.acceptBtnText}>Accept</Text>
         </Pressable>
       </View>
     </View>
@@ -178,7 +181,7 @@ export default function IncomingScreen() {
         <Pressable onPress={() => router.back()} style={s.navBack}>
           <BackIcon />
         </Pressable>
-        <Text style={s.navTitle}>Incoming Requests</Text>
+        <Text style={s.navTitle}>Requests</Text>
         {pendingIds.length > 0 && (
           <View style={s.navBadge}>
             <Text style={s.navBadgeText}>{pendingIds.length}</Text>
@@ -190,19 +193,18 @@ export default function IncomingScreen() {
         // Rec 5: designed empty state with primary action
         <View style={s.empty}>
           <Text style={s.emptyEmoji}>📭</Text>
-          <Text style={s.emptyTitle}>No swap requests yet</Text>
+          <Text style={s.emptyTitle}>No requests yet</Text>
           <Text style={s.emptySub}>
-            When someone wants to swap skills with you, their request appears here.
-            Go find matches and send the first request!
+            When someone invites you to swap, it shows up here.
           </Text>
           <Pressable style={s.emptyBtn} onPress={() => router.push('/transaction')}>
-            <Text style={s.emptyBtnText}>Browse Skill Matches</Text>
+            <Text style={s.emptyBtnText}>Browse matches</Text>
           </Pressable>
         </View>
       ) : (
         <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
           <Text style={s.intro}>
-            {pendingIds.length} person{pendingIds.length !== 1 ? 's' : ''} want{pendingIds.length === 1 ? 's' : ''} to swap with you.
+            {pendingIds.length} waiting for you
           </Text>
           {pendingIds.map(uid => (
             <RequestCard
@@ -226,7 +228,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 12,
   },
   navBack:      { width: 44, height: 44, justifyContent: 'center', alignItems: 'flex-start' },
-  navTitle:     { flex: 1, fontSize: 17, fontWeight: '800', color: '#101414' },
+  navTitle:     { flex: 1, fontSize: 18, fontWeight: '700', color: '#101414' },
   navBadge:     {
     width: 28, height: 28, borderRadius: 14,
     backgroundColor: '#FF8C42', borderWidth: 2, borderColor: '#7a3a10',
@@ -234,7 +236,7 @@ const s = StyleSheet.create({
   },
   navBadgeText: { fontSize: 13, fontWeight: '900', color: '#000' },
   scroll:       { padding: 14, gap: 14 },
-  intro:        { fontSize: 13, color: '#394140', marginBottom: 4, fontStyle: 'italic' },
+  intro:        { fontSize: 14, color: '#4a524e', marginBottom: 8, fontWeight: '500' },
   empty:        { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
   emptyEmoji:   { fontSize: 48 },
   emptyTitle:   { fontSize: 20, fontWeight: '800', color: '#101414' },
@@ -254,35 +256,34 @@ const rc = StyleSheet.create({
     shadowOpacity: 0.10, shadowRadius: 6, elevation: 3,
   },
   header:       {
-    flexDirection: 'row', alignItems: 'center',
-    padding: 12, borderBottomWidth: 1, borderBottomColor: '#d0d2ce',
+    flexDirection: 'row', alignItems: 'flex-start',
+    padding: 14, borderBottomWidth: 1, borderBottomColor: '#d0d2ce',
   },
+  headerMain:   { flex: 1, marginLeft: 12, gap: 4 },
   avatar:       {
     width: 44, height: 44, backgroundColor: '#61d8cc',
-    borderWidth: 2, borderColor: '#1f4642',
-    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: '#1f4642',
+    alignItems: 'center', justifyContent: 'center', borderRadius: 8,
   },
   avatarEmoji:  { fontSize: 22 },
-  nameRow:      { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  name:         { fontSize: 17, fontWeight: '800', color: '#101414' },
-  offers:       { fontSize: 12, color: '#394140', marginTop: 2 },
-  badge:        {
-    borderWidth: 2, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 4,
-    alignItems: 'center', minWidth: 52,
-  },
-  badgeEmoji:   { fontSize: 13 },
-  badgePct:     { fontSize: 14, fontWeight: '900' },
+  nameRow:      { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  name:         { fontSize: 17, fontWeight: '700', color: '#101414' },
+  matchLine:    { fontSize: 12, color: '#5a635f', fontWeight: '500' },
+  offers:       { fontSize: 12, color: '#394140' },
   exchange:     {
-    backgroundColor: '#e8ebe5', borderTopWidth: 1, borderTopColor: '#d0d2ce',
-    paddingHorizontal: 12, paddingVertical: 8, gap: 4,
+    backgroundColor: '#e8ebe5',
+    paddingHorizontal: 14, paddingVertical: 10, gap: 6,
   },
-  exchangeText: { fontSize: 13, color: '#2f3333', lineHeight: 18 },
-  exchangeAccent: { fontWeight: '700', color: '#1f4642' },
+  exchangeText: { fontSize: 13, color: '#2f3333', lineHeight: 20 },
+  exchangeAccent: { fontWeight: '600', color: '#1f4642' },
+  detailToggle: { paddingVertical: 10, paddingHorizontal: 14 },
+  detailToggleText: { fontSize: 13, fontWeight: '600', color: '#1f4642' },
   why:          {
-    paddingHorizontal: 12, paddingVertical: 8,
-    borderTopWidth: 1, borderTopColor: '#d0d2ce',
+    paddingHorizontal: 14, paddingBottom: 12, paddingTop: 0,
+    marginHorizontal: 12, marginBottom: 8,
+    backgroundColor: '#e8ebe5', borderRadius: 8,
   },
-  whyText:      { fontSize: 12, color: '#394140', lineHeight: 18, fontStyle: 'italic' },
+  whyText:      { fontSize: 13, color: '#394140', lineHeight: 20 },
   actions:      {
     flexDirection: 'row', gap: 8,
     padding: 10, borderTopWidth: 1, borderTopColor: '#d0d2ce',
