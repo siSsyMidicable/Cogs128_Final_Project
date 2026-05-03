@@ -19,20 +19,23 @@ const CARD_SIDE_PADDING = (SCREEN_WIDTH - CARD_WIDTH) / 2;
 const CARDS = [
   {
     id: "1",
-    title: "What's Inside",
-    description: "Connect with others to exchange skills and knowledge",
+    title: "No money. Just skills.",
+    description:
+      "SkillSwap is like a barter market for knowledge. You teach what you know — someone teaches you what you need. No cash, no credits, just mutual exchange.",
     tilt: "-1deg",
   },
   {
     id: "2",
     title: "Trust & Transparency",
-    description: "Built on honest matching algorithms",
+    description:
+      "Every match is scored with real math — skill overlap, trust history, and past fairness. Tap 'How scored?' on any card to see the live numbers.",
     tilt: "1deg",
   },
   {
     id: "3",
-    title: "Discrete Mathematics",
-    description: "Ensures fair and verified skill matches",
+    title: "Proof, not stars",
+    description:
+      "Instead of a gameable star rating, you confirm 4 verifiable facts: delivered on time, scope matched, evidence attached, would swap again.",
     tilt: "-0.8deg",
   },
   {
@@ -251,19 +254,20 @@ export default function IntroScreen() {
           {/* 3-Step Process Flow */}
           <ProcessFlow />
 
-          {/* Skip Button */}
+          {/* CTA Button — Rec 1 & 3: action-specific label */}
           <Pressable
             onPress={() => router.replace("/auth/login")}
             style={({ pressed }) => [
               styles.skipButtonContainer,
               pressed && styles.skipButtonPressed,
             ]}
+            accessibilityLabel="Get started — go to sign in"
           >
             <View style={[styles.skipGlow, styles.skipGlowA]} />
             <View style={[styles.skipGlow, styles.skipGlowB]} />
             <View style={[styles.skipGlow, styles.skipGlowC]} />
             <View style={styles.skipButton}>
-              <Text style={styles.skipLabel}>Skip Intro</Text>
+              <Text style={styles.skipLabel}>Get Started</Text>
               <Text style={styles.skipArrow}>›</Text>
             </View>
           </Pressable>

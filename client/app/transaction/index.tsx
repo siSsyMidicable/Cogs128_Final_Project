@@ -1,9 +1,12 @@
 /**
  * SkillSwap — Match Hub  (index.tsx)
  *
- * Cards are now lean: avatar, chips, why-sentence, 3 mini-bars, actions.
- * The full score breakdown lives at /transaction/score-breakdown?userId=X
- * — reached via a small "ℹ How scored?" link on each card.
+ * Report recommendations implemented here:
+ *   Rec 2 — Toast feedback (loading / success / error) on every swap action
+ *   Rec 3 — Action-specific button labels: "Request a Swap", "Accept Swap", "Swap In Progress"
+ *   Rec 4 — Text search + category filter chips
+ *   Rec 5 — Designed empty state when search/filter returns no results
+ *   Rec 6 — 1–5 star rating + review comment in CompletionModal; avg rating shown on cards
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -12,19 +15,39 @@ import {
   SafeAreaView, StatusBar, Platform, UIManager,
   LayoutAnimation, Modal, ScrollView, TextInput,
 } from 'react-native';
-import Svg, { Path, Circle } from 'react-native-svg';
+import Svg, { Path, Circle, Polygon } from 'react-native-svg';
 import { router } from 'expo-router';
 import { useUser } from '@/lib/auth/auth';
 import {
-  matchScore, useMatchingState, whyThisMatch,
+  matchScore, useMatchingState, whyThisMatch, averageStarRating, swapCount,
   type MatchUser, type MatchScoreBreakdown, type ProofField,
 } from '@/lib/matching/matching';
 import { YOU, MOCK_USERS } from '@/lib/matching/data';
+import { toast } from '@/components/ui/toast';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental)
   UIManager.setLayoutAnimationEnabledExperimental(true);
 
-// ─── tiny helpers ──────────────────────────────────────────────────────────────────
+// ─── Skill categories ──────────────────────────────────────────────────────────
+
+const CATEGORIES = ['All', 'Tech', 'Creative', 'Life Skills', 'Finance'] as const;
+type Category = typeof CATEGORIES[number];
+
+const CATEGORY_SKILLS: Record<Exclude<Category, 'All'>, string[]> = {
+  Tech:         ['Web Dev', 'Linux Admin', 'Computer Repair'],
+  Creative:     ['Graphic Design', 'Logo Creation', 'Illustration', 'Photography', 'Social Media', 'Video Editing', 'Makeup', 'Styling', 'Event Coordination', 'Cooking Classes'],
+  'Life Skills':['Meal Prep', 'Nutrition Advice', 'Car Detailing', 'Mechanic', 'Welding'],
+  Finance:      ['Bookkeeping', 'Tax Help', 'Spreadsheets', 'Resume Help'],
+};
+
+function userMatchesCategory(user: MatchUser, cat: Category): boolean {
+  if (cat === 'All') return true;
+  const catSkills = CATEGORY_SKILLS[cat];
+  return user.offers.some(s => catSkills.includes(s)) ||
+         user.requests.some(s => catSkills.includes(s));
+}
+
+// ─── tiny helpers ───────────────────────────────────────────────────────────────
 
 function pct(v: number) { return `${Math.round(v * 100)}%`; }
 
@@ -35,7 +58,7 @@ function verdict(v: number) {
   return           { emoji: '⚠️', label: 'Weak',       color: '#EF767A' };
 }
 
-// ─── icons ────────────────────────────────────────────────────────────────────
+// ─── icons ──────────────────────────────────────────────────────────────────────
 
 function SwapIcon({ size = 18, color = '#000' }: { size?: number; color?: string }) {
   return (
@@ -68,11 +91,11 @@ function SaveIcon({ size = 16, color = '#394140', filled = false }: { size?: num
   );
 }
 
-function NegotiateIcon({ size = 18, color = '#000' }: { size?: number; color?: string }) {
+function SearchIcon({ size = 16, color = '#607876' }: { size?: number; color?: string }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Path d="M3 6a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H7l-4 3V6z" stroke={color} strokeWidth={1.75} strokeLinejoin="round" />
-      <Path d="M14 9h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-2l-3 2.5V10" stroke={color} strokeWidth={1.75} strokeLinejoin="round" />
+      <Circle cx={11} cy={11} r={7} stroke={color} strokeWidth={1.75} />
+      <Path d="M16.5 16.5L21 21" stroke={color} strokeWidth={1.75} strokeLinecap="round" />
     </Svg>
   );
 }
@@ -96,7 +119,47 @@ function TransparencyIcon({ size = 15, color = '#a8c5c2' }: { size?: number; col
   );
 }
 
-// ─── ScoreBar ───────────────────────────────────────────────────────────────────
+// ─── StarRating ─────────────────────────────────────────────────────────────────
+
+function StarRating({
+  value, onChange, size = 28,
+}: {
+  value: number; onChange?: (v: number) => void; size?: number;
+}) {
+  return (
+    <View style={{ flexDirection: 'row', gap: 6 }}>
+      {[1, 2, 3, 4, 5].map(n => (
+        <Pressable key={n} onPress={() => onChange?.(n)}
+          accessibilityLabel={`Rate ${n} star${n !== 1 ? 's' : ''}`}
+          style={{ padding: 2 }}>
+          <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+            <Polygon
+              points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"
+              fill={n <= value ? '#FFD166' : 'none'}
+              stroke={n <= value ? '#8a6800' : '#607876'}
+              strokeWidth={1.75}
+              strokeLinejoin="round"
+            />
+          </Svg>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+/** Compact display-only star row shown on match cards */
+function StarDisplay({ rating, count }: { rating: number; count: number }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+      <StarRating value={Math.round(rating)} size={13} />
+      <Text style={{ fontSize: 11, color: '#607876', fontWeight: '600' }}>
+        {rating.toFixed(1)} ({count})
+      </Text>
+    </View>
+  );
+}
+
+// ─── ScoreBar ──────────────────────────────────────────────────────────────────
 
 function ScoreBar({ value, color }: { value: number; color: string }) {
   return (
@@ -106,7 +169,7 @@ function ScoreBar({ value, color }: { value: number; color: string }) {
   );
 }
 
-// ─── Chip ───────────────────────────────────────────────────────────────────────
+// ─── Chip ──────────────────────────────────────────────────────────────────────
 
 function Chip({ label, variant }: { label: string; variant: 'offer' | 'request' | 'match' }) {
   const bg = variant === 'offer' ? '#1f4642' : variant === 'request' ? '#FF8C42' : '#61d8cc';
@@ -118,17 +181,20 @@ function Chip({ label, variant }: { label: string; variant: 'offer' | 'request' 
   );
 }
 
-// ─── CompletionModal ──────────────────────────────────────────────────────────────
+// ─── CompletionModal ───────────────────────────────────────────────────────────
+// Rec 6: added 1–5 star rating + review comment
 
 function CompletionModal({
   visible, partner, currentUser, onClose, onSubmit,
 }: {
   visible: boolean; partner: MatchUser | null; currentUser: MatchUser;
   onClose: () => void;
-  onSubmit: (given: string, received: string, proof: ProofField) => void;
+  onSubmit: (given: string, received: string, proof: ProofField, starRating: number, reviewComment: string) => void;
 }) {
   const [given, setGiven]       = useState('');
   const [received, setReceived] = useState('');
+  const [starRating, setStarRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState('');
   const [proof, setProof]       = useState<ProofField>({
     deliveredOnTime: false, scopeMatchedAgreement: false,
     portfolioEvidenceAttached: false, wouldSwapAgain: false, notes: '',
@@ -149,21 +215,26 @@ function CompletionModal({
     fairness >= 0.35 ? 'Partial — some issues noted.' :
     'Poor swap — trust score will reflect this.';
 
+  const starLabel = ['', 'Poor', 'Fair', 'Good', 'Great', 'Excellent!'][starRating] ?? '';
+
   function handleSubmit() {
-    if (!given.trim() || !received.trim()) return;
-    onSubmit(given.trim(), received.trim(), proof);
-    setGiven(''); setReceived('');
+    if (!given.trim() || !received.trim() || starRating === 0) return;
+    onSubmit(given.trim(), received.trim(), proof, starRating, reviewComment.trim());
+    // reset
+    setGiven(''); setReceived(''); setStarRating(0); setReviewComment('');
     setProof({ deliveredOnTime: false, scopeMatchedAgreement: false,
                portfolioEvidenceAttached: false, wouldSwapAgain: false, notes: '' });
   }
 
   if (!partner) return null;
 
+  const canSubmit = given.trim() && received.trim() && starRating > 0;
+
   const checks: { key: keyof Omit<ProofField,'notes'>; label: string; desc: string; weight: string }[] = [
     { key: 'deliveredOnTime',           label: 'Delivered on time',             desc: 'They finished when they promised.',           weight: '×0.35' },
     { key: 'scopeMatchedAgreement',     label: 'Scope matched our agreement',   desc: 'They taught what we agreed on.',              weight: '×0.35' },
-    { key: 'portfolioEvidenceAttached', label: 'Evidence / portfolio attached',  desc: 'There’s a link or file proving the work.',   weight: '×0.15' },
-    { key: 'wouldSwapAgain',            label: 'Would swap again',               desc: 'Overall I’d recommend this person.',          weight: '×0.15' },
+    { key: 'portfolioEvidenceAttached', label: 'Evidence / portfolio attached',  desc: 'There's a link or file proving the work.',   weight: '×0.15' },
+    { key: 'wouldSwapAgain',            label: 'Would swap again',               desc: 'Overall I'd recommend this person.',          weight: '×0.15' },
   ];
 
   return (
@@ -176,20 +247,47 @@ function CompletionModal({
             <Text style={modal.title}>Complete Swap with {partner.name}</Text>
           </View>
           <Text style={modal.subtitle}>
-            4 checkboxes replace a star rating — each one feeds directly into their trust score.
+            Rate your experience and confirm 4 proof checkpoints — each feeds directly into their trust score.
           </Text>
           <ScrollView showsVerticalScrollIndicator={false}>
+
+            {/* ── Skills exchanged ── */}
             <Text style={modal.fieldLabel}>Skill you gave</Text>
             <TextInput style={modal.input} value={given} onChangeText={setGiven}
               placeholder={currentUser.offers[0] ?? 'e.g. Web Dev'} placeholderTextColor="#607876" />
             <Text style={modal.fieldLabel}>Skill you received</Text>
             <TextInput style={modal.input} value={received} onChangeText={setReceived}
               placeholder={partner.offers[0] ?? 'e.g. Graphic Design'} placeholderTextColor="#607876" />
+
+            {/* ── Rec 6: Star rating ── */}
+            <Text style={modal.fieldLabel}>Overall rating (required)</Text>
+            <View style={modal.starRow}>
+              <StarRating value={starRating} onChange={setStarRating} size={32} />
+              {starRating > 0 && (
+                <Text style={modal.starLabel}>{starLabel}</Text>
+              )}
+            </View>
+            {starRating === 0 && (
+              <Text style={modal.starHint}>Tap a star to rate {partner.name}'s performance</Text>
+            )}
+
+            {/* ── Rec 6: Review comment ── */}
+            <Text style={modal.fieldLabel}>Review (optional)</Text>
+            <TextInput
+              style={[modal.input, { height: 64, textAlignVertical: 'top' }]}
+              value={reviewComment}
+              onChangeText={setReviewComment}
+              placeholder={`What was it like swapping with ${partner.name}?`}
+              placeholderTextColor="#607876"
+              multiline
+            />
+
+            {/* ── Proof checkboxes ── */}
             <View style={modal.proofHeader}>
               <TransparencyIcon size={15} color="#a8c5c2" />
-              <Text style={[modal.fieldLabel, { marginTop: 0, marginLeft: 6, marginBottom: 0 }]}>How did it go?</Text>
+              <Text style={[modal.fieldLabel, { marginTop: 0, marginLeft: 6, marginBottom: 0 }]}>Transparency proof</Text>
             </View>
-            <Text style={modal.proofSub}>Check everything that is true.</Text>
+            <Text style={modal.proofSub}>Check everything that is true about this swap.</Text>
             {checks.map(c => (
               <Pressable key={c.key} style={[modal.checkRow, proof[c.key] && modal.checkRowActive]}
                 onPress={() => toggle(c.key)}>
@@ -203,6 +301,8 @@ function CompletionModal({
                 <Text style={modal.checkWeight}>{c.weight}</Text>
               </Pressable>
             ))}
+
+            {/* ── Fairness preview ── */}
             <View style={[modal.fairRow, { borderColor: fairness >= 0.65 ? '#61d8cc' : fairness >= 0.35 ? '#FFD166' : '#EF767A' }]}>
               <View style={{ flex: 1 }}>
                 <Text style={modal.fairTitle}>Fairness score</Text>
@@ -212,19 +312,32 @@ function CompletionModal({
                 {pct(fairness)}
               </Text>
             </View>
+
             <Text style={modal.fieldLabel}>Notes (optional)</Text>
             <TextInput style={[modal.input, { height: 72, textAlignVertical: 'top' }]}
               value={proof.notes} onChangeText={t => setProof(p => ({ ...p, notes: t }))}
               placeholder="Context, evidence links…" placeholderTextColor="#607876" multiline />
+
+            {/* ── Submit hint ── */}
+            {!canSubmit && (
+              <Text style={modal.submitHint}>
+                {!given.trim() || !received.trim()
+                  ? '⚠ Enter the skills exchanged above to continue.'
+                  : '⚠ A star rating is required before submitting.'}
+              </Text>
+            )}
+
             <View style={modal.actions}>
               <Pressable style={modal.cancelBtn} onPress={onClose}>
                 <Text style={modal.cancelText}>Cancel</Text>
               </Pressable>
-              <Pressable style={[modal.submitBtn, (!given.trim() || !received.trim()) && modal.submitDisabled]}
-                onPress={handleSubmit} disabled={!given.trim() || !received.trim()}>
+              <Pressable
+                style={[modal.submitBtn, !canSubmit && modal.submitDisabled]}
+                onPress={handleSubmit}
+                disabled={!canSubmit}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <SwapIcon size={16} color="#000" />
-                  <Text style={modal.submitText}>Submit</Text>
+                  <Text style={modal.submitText}>Submit Swap</Text>
                 </View>
               </Pressable>
             </View>
@@ -235,9 +348,9 @@ function CompletionModal({
   );
 }
 
-// ─── MatchCard ──────────────────────────────────────────────────────────────────
-// Lean card: no math panel, no dropdown. Just the essentials.
-// Full breakdown → /transaction/score-breakdown?userId=X
+// ─── MatchCard ─────────────────────────────────────────────────────────────────
+// Rec 3: action-specific labels
+// Rec 6: show aggregate star rating
 
 function MatchCard({
   user, currentUser, connections, completed, requests, request, connect, onComplete,
@@ -259,6 +372,27 @@ function MatchCard({
   const youCover  = currentUser.offers.filter(s => user.requests.includes(s));
   const theyCover = user.offers.filter(s => currentUser.requests.includes(s));
 
+  // Rec 6: live aggregate rating for this user
+  const avgRating = averageStarRating(user.id);
+  const numSwaps  = swapCount(user.id);
+
+  // Rec 2 & Rec 3: action handlers with toast feedback
+  function handleRequest() {
+    toast.loading('Sending swap request…');
+    setTimeout(() => {
+      request(user.id);
+      toast.success(`Swap requested! You'll be notified when ${user.name} responds.`);
+    }, 600);
+  }
+
+  function handleAccept() {
+    toast.loading('Accepting swap…');
+    setTimeout(() => {
+      connect(user.id);
+      toast.success(`Swap accepted! ${user.name} is now in your Active Swaps.`);
+    }, 500);
+  }
+
   return (
     <View style={s.card}>
       {/* ── Header ── */}
@@ -270,12 +404,18 @@ function MatchCard({
             <VerifiedIcon size={13} color="#4f98a3" />
           </View>
           <Text style={s.offersLine} numberOfLines={1}>Offers: {user.offers.join(', ')}</Text>
+          {/* Rec 6: avg rating row */}
+          {avgRating !== null && (
+            <View style={{ marginTop: 3 }}>
+              <StarDisplay rating={avgRating} count={numSwaps} />
+            </View>
+          )}
         </View>
         <Pressable onPress={() => setSaved(v => !v)} style={s.saveBtn}
           accessibilityLabel={saved ? 'Unsave' : 'Save'}>
           <SaveIcon size={18} color={saved ? '#61d8cc' : '#394140'} filled={saved} />
         </Pressable>
-        {/* Score badge — verdict + percentage only */}
+        {/* Score badge */}
         <View style={[s.badge, { borderColor: v.color }]}>
           <Text style={s.badgeEmoji}>{v.emoji}</Text>
           <Text style={[s.badgePct, { color: v.color }]}>{pct(scores.total)}</Text>
@@ -299,12 +439,12 @@ function MatchCard({
         <Text style={s.noOverlap}>— No direct skill overlap</Text>
       )}
 
-      {/* ── Why this match (one sentence) ── */}
+      {/* ── Why this match ── */}
       <View style={s.why}>
         <Text style={s.whyText}>{why}</Text>
       </View>
 
-      {/* ── 3 compact score bars (no toggle, always visible) ── */}
+      {/* ── Score bars ── */}
       <View style={s.bars}>
         <View style={s.barRow}>
           <Text style={s.barLabel}>Skill Fit</Text>
@@ -332,7 +472,7 @@ function MatchCard({
         <Text style={s.infoLinkText}>ℹ  How was {pct(scores.total)} calculated?</Text>
       </Pressable>
 
-      {/* ── Actions ── */}
+      {/* ── Actions (Rec 3: action-specific labels) ── */}
       <View style={s.actionRow}>
         {isDone ? (
           <View style={[s.btn, s.doneBtn]}>
@@ -342,8 +482,9 @@ function MatchCard({
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <View style={[s.btn, s.connectedBtn, { flex: 1 }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <NegotiateIcon size={16} color="#1f4642" />
-                <Text style={s.btnText}>Connected</Text>
+                <SwapIcon size={16} color="#1f4642" />
+                {/* Rec 3 */}
+                <Text style={s.btnText}>Swap In Progress</Text>
               </View>
             </View>
             <Pressable style={[s.btn, s.completeBtn, { flex: 1 }]} onPress={() => onComplete(user)}>
@@ -354,17 +495,19 @@ function MatchCard({
             </Pressable>
           </View>
         ) : isRequested ? (
-          <Pressable style={[s.btn, s.acceptBtn]} onPress={() => connect(user.id)}>
+          // Rec 3: was "Accept Match"
+          <Pressable style={[s.btn, s.acceptBtn]} onPress={handleAccept}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <SwapIcon size={16} color="#000" />
-              <Text style={s.btnText}>Accept Match</Text>
+              <Text style={s.btnText}>Accept Swap</Text>
             </View>
           </Pressable>
         ) : (
-          <Pressable style={[s.btn, s.requestBtn]} onPress={() => request(user.id)}>
+          // Rec 3: was "Request Match"
+          <Pressable style={[s.btn, s.requestBtn]} onPress={handleRequest}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <SwapIcon size={16} color="#000" />
-              <Text style={s.btnText}>Request Match</Text>
+              <Text style={s.btnText}>Request a Swap</Text>
             </View>
           </Pressable>
         )}
@@ -373,12 +516,41 @@ function MatchCard({
   );
 }
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────────
+// ─── EmptySearchState (Rec 5) ──────────────────────────────────────────────────
+
+function EmptySearchState({ query, category, onClear }: { query: string; category: Category; onClear: () => void }) {
+  const reason = query && category !== 'All'
+    ? `"${query}" in ${category}`
+    : query
+    ? `"${query}"`
+    : category !== 'All'
+    ? `the ${category} category`
+    : 'your current filters';
+
+  return (
+    <View style={s.emptySearch}>
+      <Text style={s.emptySearchEmoji}>🔍</Text>
+      <Text style={s.emptySearchTitle}>No matches found for {reason}</Text>
+      <Text style={s.emptySearchSub}>
+        Try a different search term or category — or be the first to list that skill!
+      </Text>
+      <Pressable style={s.emptySearchBtn} onPress={onClear}>
+        <Text style={s.emptySearchBtnText}>Clear Filters</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+// ─── Main Screen ───────────────────────────────────────────────────────────────
 
 export default function MatchHub() {
   const { data: authUser } = useUser();
   const { connections, requests, completed, request, connect, complete } = useMatchingState();
   const [completionTarget, setCompletionTarget] = useState<MatchUser | null>(null);
+
+  // Rec 4: search + category state
+  const [searchQuery, setSearchQuery]   = useState('');
+  const [activeCategory, setActiveCategory] = useState<Category>('All');
 
   const sortedUsers = useMemo(
     () => [...MOCK_USERS]
@@ -388,7 +560,29 @@ export default function MatchHub() {
     [],
   );
 
+  // Rec 4: apply search + category filter
+  const filteredUsers = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return sortedUsers.filter(u => {
+      const matchesCategory = userMatchesCategory(u, activeCategory);
+      const matchesSearch = !q ||
+        u.name.toLowerCase().includes(q) ||
+        u.offers.some(s => s.toLowerCase().includes(q)) ||
+        u.requests.some(s => s.toLowerCase().includes(q));
+      return matchesCategory && matchesSearch;
+    });
+  }, [sortedUsers, searchQuery, activeCategory]);
+
   const pending = MOCK_USERS.length - connections.size - requests.size - completed.size;
+
+  // Rec 2: complete with toast feedback
+  function handleComplete(partner: MatchUser, given: string, received: string, proof: ProofField, starRating: number, reviewComment: string) {
+    toast.loading('Recording swap…');
+    setTimeout(() => {
+      complete(partner, YOU, given, received, proof, starRating, reviewComment);
+      toast.success(`Swap with ${partner.name} recorded! Check your History for the full breakdown.`);
+    }, 500);
+  }
 
   return (
     <SafeAreaView style={s.safe}>
@@ -439,27 +633,87 @@ export default function MatchHub() {
         </View>
       </View>
 
-      <FlatList
-        data={sortedUsers}
-        keyExtractor={u => u.id}
-        renderItem={({ item }) => (
-          <MatchCard
-            user={item} currentUser={YOU}
-            connections={connections} completed={completed} requests={requests}
-            request={request} connect={connect}
-            onComplete={p => setCompletionTarget(p)}
-          />
+      {/* Rec 4: Search bar */}
+      <View style={s.searchBar}>
+        <SearchIcon size={16} color="#607876" />
+        <TextInput
+          style={s.searchInput}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search by name or skill…"
+          placeholderTextColor="#607876"
+          returnKeyType="search"
+          clearButtonMode="while-editing"
+          accessibilityLabel="Search matches by name or skill"
+        />
+        {searchQuery.length > 0 && (
+          <Pressable onPress={() => setSearchQuery('')} style={s.searchClear}
+            accessibilityLabel="Clear search">
+            <Text style={s.searchClearText}>✕</Text>
+          </Pressable>
         )}
-        contentContainerStyle={s.list}
-        showsVerticalScrollIndicator={false}
-      />
+      </View>
+
+      {/* Rec 4: Category filter chips */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.filterRow}
+        style={s.filterScroll}
+      >
+        {CATEGORIES.map(cat => (
+          <Pressable
+            key={cat}
+            style={[s.filterChip, activeCategory === cat && s.filterChipActive]}
+            onPress={() => setActiveCategory(cat)}
+            accessibilityLabel={`Filter by ${cat}`}
+          >
+            <Text style={[s.filterChipText, activeCategory === cat && s.filterChipTextActive]}>
+              {cat}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+
+      {/* Rec 4+5: result count or empty state */}
+      {filteredUsers.length === 0 ? (
+        <EmptySearchState
+          query={searchQuery}
+          category={activeCategory}
+          onClear={() => { setSearchQuery(''); setActiveCategory('All'); }}
+        />
+      ) : (
+        <>
+          {(searchQuery || activeCategory !== 'All') && (
+            <Text style={s.resultCount}>
+              {filteredUsers.length} result{filteredUsers.length !== 1 ? 's' : ''}
+              {activeCategory !== 'All' ? ` in ${activeCategory}` : ''}
+              {searchQuery ? ` for "${searchQuery}"` : ''}
+            </Text>
+          )}
+          <FlatList
+            data={filteredUsers}
+            keyExtractor={u => u.id}
+            renderItem={({ item }) => (
+              <MatchCard
+                user={item} currentUser={YOU}
+                connections={connections} completed={completed} requests={requests}
+                request={request} connect={connect}
+                onComplete={p => setCompletionTarget(p)}
+              />
+            )}
+            contentContainerStyle={s.list}
+            showsVerticalScrollIndicator={false}
+          />
+        </>
+      )}
 
       <CompletionModal
         visible={completionTarget !== null} partner={completionTarget}
         currentUser={YOU} onClose={() => setCompletionTarget(null)}
-        onSubmit={(given, received, proof) => {
+        onSubmit={(given, received, proof, starRating, reviewComment) => {
           if (!completionTarget) return;
-          complete(completionTarget, YOU, given, received, proof);
+          handleComplete(completionTarget, given, received, proof, starRating, reviewComment);
           setCompletionTarget(null);
         }}
       />
@@ -467,7 +721,7 @@ export default function MatchHub() {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// ─── Styles ────────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
   safe:         { flex: 1, backgroundColor: '#d6d8d3' },
@@ -493,6 +747,34 @@ const s = StyleSheet.create({
   yourProfileTitle: { fontSize: 11, fontWeight: '700', color: '#434948', letterSpacing: 1.2, marginBottom: 6 },
   chipRowPlain: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
   chipGroupLabel: { fontSize: 11, fontWeight: '700', color: '#2f3333', width: 44 },
+
+  // Rec 4: search bar
+  searchBar:    {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#f3f4f1', borderBottomWidth: 1, borderBottomColor: '#d0d2ce',
+    paddingHorizontal: 14, paddingVertical: 8,
+  },
+  searchInput:  {
+    flex: 1, fontSize: 14, color: '#101414', height: 36,
+    backgroundColor: '#e8ebe5', borderWidth: 1, borderColor: '#d0d2ce',
+    borderRadius: 4, paddingHorizontal: 10,
+  },
+  searchClear:  { padding: 4 },
+  searchClearText: { fontSize: 13, color: '#607876', fontWeight: '700' },
+
+  // Rec 4: category filter
+  filterScroll: { maxHeight: 44, backgroundColor: '#f3f4f1', borderBottomWidth: 1, borderBottomColor: '#d0d2ce' },
+  filterRow:    { paddingHorizontal: 12, paddingVertical: 6, gap: 8, alignItems: 'center' },
+  filterChip:   {
+    borderRadius: 4, paddingHorizontal: 12, paddingVertical: 6,
+    borderWidth: 1.5, borderColor: '#d0d2ce', backgroundColor: '#e8ebe5',
+  },
+  filterChipActive: { backgroundColor: '#1f4642', borderColor: '#61d8cc' },
+  filterChipText:   { fontSize: 12, fontWeight: '700', color: '#394140' },
+  filterChipTextActive: { color: '#61d8cc' },
+
+  resultCount:  { fontSize: 12, color: '#607876', paddingHorizontal: 16, paddingTop: 8, fontStyle: 'italic' },
+
   list:         { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 32, gap: 14 },
   card:         {
     backgroundColor: '#f3f4f1', borderWidth: 2, borderColor: '#2f3333',
@@ -552,13 +834,24 @@ const s = StyleSheet.create({
   connectedBtn: { backgroundColor: '#d0f0ec', borderColor: '#2a8780' },
   completeBtn:  { backgroundColor: '#FFD166', borderColor: '#8a6800' },
   doneBtn:      { backgroundColor: '#e8ebe5', borderColor: '#999' },
+
+  // Rec 5: empty search state
+  emptySearch:      { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 12 },
+  emptySearchEmoji: { fontSize: 48 },
+  emptySearchTitle: { fontSize: 18, fontWeight: '800', color: '#101414', textAlign: 'center' },
+  emptySearchSub:   { fontSize: 14, color: '#607876', textAlign: 'center', lineHeight: 22, maxWidth: 300 },
+  emptySearchBtn:   {
+    backgroundColor: '#61d8cc', borderWidth: 2, borderColor: '#1f4642',
+    paddingVertical: 12, paddingHorizontal: 24, marginTop: 4,
+  },
+  emptySearchBtnText: { fontSize: 14, fontWeight: '800', color: '#000' },
 });
 
 const modal = StyleSheet.create({
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
   sheet:        {
     backgroundColor: '#1c2424', borderTopWidth: 2, borderTopColor: '#61d8cc',
-    borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, maxHeight: '90%',
+    borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, maxHeight: '92%',
   },
   handle:       { width: 40, height: 4, backgroundColor: '#607876', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   titleRow:     { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6 },
@@ -569,6 +862,11 @@ const modal = StyleSheet.create({
     backgroundColor: '#131b1b', borderWidth: 1, borderColor: '#2f4a47',
     color: '#fff', padding: 10, fontSize: 14,
   },
+  // Rec 6: star rating row
+  starRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 },
+  starLabel:    { fontSize: 14, fontWeight: '700', color: '#FFD166' },
+  starHint:     { fontSize: 11, color: '#607876', fontStyle: 'italic', marginBottom: 4 },
+
   proofHeader:  {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#2f4a47', marginBottom: 4,
@@ -592,6 +890,7 @@ const modal = StyleSheet.create({
   fairTitle:    { fontSize: 11, fontWeight: '700', color: '#a8c5c2', marginBottom: 3 },
   fairBlurb:    { fontSize: 12, color: '#607876' },
   fairValue:    { fontSize: 28, fontWeight: '900' },
+  submitHint:   { fontSize: 12, color: '#FFD166', marginTop: 4, marginBottom: 2, textAlign: 'center' },
   actions:      { flexDirection: 'row', gap: 10, marginTop: 8, marginBottom: 20 },
   cancelBtn:    { flex: 1, padding: 14, borderWidth: 2, borderColor: '#2f4a47', alignItems: 'center' },
   cancelText:   { fontSize: 14, fontWeight: '700', color: '#607876' },

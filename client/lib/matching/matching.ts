@@ -74,6 +74,10 @@ export type HistoryRecord = {
   proof: ProofField;
   fairness: number;
   scores: MatchScoreBreakdown;
+  /** 1–5 star rating given by the user at swap completion */
+  starRating?: number;
+  /** Optional freeform review comment */
+  reviewComment?: string;
 };
 
 // ─── Core Math ────────────────────────────────────────────────────────────────
@@ -190,6 +194,8 @@ export function completeSwap(
   skillReceived: string,
   proof: ProofField,
   dateOverride?: string,
+  starRating?: number,
+  reviewComment?: string,
 ): void {
   const fair   = fairnessFromProof(proof);
   const scores = matchScore(currentUser, partner, fair);
@@ -204,11 +210,25 @@ export function completeSwap(
     proof,
     fairness: fair,
     scores,
+    starRating,
+    reviewComment,
   };
   _history = [record, ..._history];
   _completed.add(partner.id);
   _connections.delete(partner.id);
   _notify();
+}
+
+/** Returns the average star rating for a given partnerId (across all completed swaps) */
+export function averageStarRating(partnerId: string): number | null {
+  const records = _history.filter(r => r.partnerId === partnerId && r.starRating !== undefined);
+  if (records.length === 0) return null;
+  return records.reduce((sum, r) => sum + (r.starRating ?? 0), 0) / records.length;
+}
+
+/** Returns total number of completed swaps for a given partnerId */
+export function swapCount(partnerId: string): number {
+  return _history.filter(r => r.partnerId === partnerId).length;
 }
 
 export function getMatchingState() {
@@ -231,8 +251,8 @@ export function useMatchingState() {
   const connect  = useCallback((id: string) => confirmConnect(id), []);
   const decline  = useCallback((id: string) => declineRequest(id), []);
   const complete = useCallback(
-    (partner: MatchUser, cu: MatchUser, given: string, received: string, proof: ProofField) =>
-      completeSwap(partner, cu, given, received, proof),
+    (partner: MatchUser, cu: MatchUser, given: string, received: string, proof: ProofField, starRating?: number, reviewComment?: string) =>
+      completeSwap(partner, cu, given, received, proof, undefined, starRating, reviewComment),
     [],
   );
   return { ...state, request, connect, decline, complete };
