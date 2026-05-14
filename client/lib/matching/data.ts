@@ -2,7 +2,7 @@
  * Seed users for SkillSwap matching demo.
  *
  * Pre-seeded state:
- *   completed:  Alex (F=1.0), Maria (F=0.85), Daniel (F=0.50)
+ *   completed:  Maria (F=0.85), Daniel (F=0.50)
  *   connected:  Jasmine, Kevin  \u2190 live active swaps in Ongoing screen
  *   requested:  Lina             \u2190 incoming request waiting for acceptance
  */
@@ -98,20 +98,9 @@ export const MOCK_USERS: MatchUser[] = [
   },
 ];
 
-const [alex, maria, daniel, jasmine, kevin, lina] = MOCK_USERS;
+const [, maria, daniel, jasmine, kevin, lina] = MOCK_USERS;
 
 // \u2500\u2500\u2500 Completed swaps (history seed) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-
-completeSwap(
-  alex, YOU,
-  'Web Dev', 'Graphic Design',
-  { deliveredOnTime: true, scopeMatchedAgreement: true,
-    portfolioEvidenceAttached: true, wouldSwapAgain: true,
-    notes: 'Alex redesigned the landing page \u2014 clean work, delivered in 3 days.' },
-  '2026-04-20T14:00:00.000Z',
-  5,
-  'Alex was fantastic. Fast, clean, and exactly what I asked for.',
-);
 
 completeSwap(
   maria, YOU,
