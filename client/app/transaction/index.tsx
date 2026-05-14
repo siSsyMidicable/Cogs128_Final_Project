@@ -120,7 +120,7 @@ function SearchIcon({ size = 16, color = '#607876' }: { size?: number; color?: s
   );
 }
 
-function ClearIcon({ size = 16, color = '#607876' }: { size?: number; color?: string }) {
+function ClearIcon({ size = 16, color = '#607876' }: { size?: nunumbermber; color?: string }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path d="M18 6L6 18M6 6l12 12" stroke={color} strokeWidth={2} strokeLinecap="round" />
