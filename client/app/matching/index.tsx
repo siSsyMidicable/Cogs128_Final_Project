@@ -11,7 +11,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { MOCK_USERS, YOU } from '@/lib/matching/data';
-// ✔️ Fix: correct function name is matchScore, not computeMatchScore
 import { matchScore, getMatchingState, sendRequest } from '@/lib/matching/matching';
 
 const { width: SW } = Dimensions.get('window');
@@ -29,31 +28,46 @@ const C = {
   tealDark: '#2a8780', orange: '#FF8C42', shadow: '#000',
 };
 
-// ─── Natural spring settle ──────────────────────────────────────────────────
-// One spring from an offset to 0 — tension/friction controls the feel.
-// This is physics-based, not a scripted sequence, so it decelerates organically.
+// ─── Fluid spring settle ───────────────────────────────────────────────────
+// Physics feel: low tension (lazy pull-back) + low friction (gentle overshoot)
+// produces an organic deceleration rather than a stiff snap.
 function useSettleAnim() {
-  const anim = useRef(new Animated.Value(0)).current;
-  const spring = useRef<Animated.CompositeAnimation | null>(null);
+  const translateX = useRef(new Animated.Value(0)).current;
+  const scale      = useRef(new Animated.Value(1)).current;
+  const spring     = useRef<Animated.CompositeAnimation | null>(null);
 
   const trigger = useCallback((fromDirection: 'left' | 'right' = 'right') => {
     spring.current?.stop();
-    // Start offset in the direction the swipe came from
-    anim.setValue(fromDirection === 'right' ? 14 : -14);
-    spring.current = Animated.spring(anim, {
-      toValue: 0,
-      useNativeDriver: true,
-      tension: 60,      // how fast it pulls back to 0 (lower = slower, lazier)
-      friction: 6,      // how much it oscillates (lower = more wobble, higher = overdamped)
-      velocity: 0,
-    });
-    spring.current.start();
-  }, [anim]);
 
-  return { anim, trigger };
+    // Kick in from the arrival side — card "drifts in" naturally
+    translateX.setValue(fromDirection === 'right' ? 18 : -18);
+    scale.setValue(0.97); // subtle shrink at entry
+
+    spring.current = Animated.parallel([
+      // Lateral glide — soft tension so it lazily settles, not snaps
+      Animated.spring(translateX, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 38,    // low = slow, dreamy pull-back
+        friction: 7,    // mid = one gentle overshoot then rest
+        velocity: 2,
+      }),
+      // Subtle scale bloom — pops into full size as it settles
+      Animated.spring(scale, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 50,
+        friction: 8,
+        velocity: 1,
+      }),
+    ]);
+    spring.current.start();
+  }, [translateX, scale]);
+
+  return { translateX, scale, trigger };
 }
 
-// ─── Match card ────────────────────────────────────────────────────────────────
+// ─── Match card ──────────────────────────────────────────────────────────────
 function MatchCard({
   user, isActive, score, status, swipeDir, onRequest,
 }: {
@@ -64,7 +78,7 @@ function MatchCard({
   swipeDir: 'left' | 'right';
   onRequest: () => void;
 }) {
-  const { anim, trigger } = useSettleAnim();
+  const { translateX, scale, trigger } = useSettleAnim();
   const wasActive = useRef(false);
 
   useEffect(() => {
@@ -93,7 +107,7 @@ function MatchCard({
         style={[
           mc.animLayer,
           isActive
-            ? { transform: [{ translateX: anim }] }
+            ? { transform: [{ translateX }, { scale }] }
             : { opacity: 0.60, transform: [{ scale: 0.95 }] },
         ]}
       >
@@ -176,7 +190,7 @@ const mc = StyleSheet.create({
   btnText:      { fontSize: 15, fontWeight: '800', color: '#fff' },
 });
 
-// ─── Dots ──────────────────────────────────────────────────────────────────────
+// ─── Dots ─────────────────────────────────────────────────────────────────────
 function Dots({ count, active }: { count: number; active: number }) {
   return (
     <View style={d.row}>
@@ -203,7 +217,6 @@ export default function MatchingScreen() {
   const state  = getMatchingState();
   const scored = MOCK_USERS.map(u => ({
     user: u,
-    // ✔️ correct function: matchScore returns a breakdown object; use .total
     score: matchScore(YOU, u).total,
     status: (
       state.completed.has(u.id)   ? 'completed' :
@@ -217,7 +230,6 @@ export default function MatchingScreen() {
   const onViewable = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     if (viewableItems.length > 0 && viewableItems[0].index !== null) {
       const next = viewableItems[0].index!;
-      setPrevIndex(i => { return i; }); // capture before update
       setActiveIndex(prev => { setPrevIndex(prev); return next; });
     }
   }, []);

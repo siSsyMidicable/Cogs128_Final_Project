@@ -2,11 +2,13 @@
  * /transaction/incoming
  * Pending swap requests waiting for YOU to accept or decline.
  * Seeded: Lina sent a request.
+ * Each pending card has a pre-trade check-in panel so you can
+ * message the requester before committing to a swap.
  */
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView,
-  Pressable, StatusBar,
+  View, Text, StyleSheet, ScrollView, KeyboardAvoidingView,
+  Pressable, StatusBar, TextInput, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
@@ -52,6 +54,149 @@ function BackIcon() {
   );
 }
 
+// ─── Pre-trade check-in panel (used on each incoming card) ───────────────────
+type PreMessage = { text: string; fromMe: boolean; time: string };
+
+function PreTradeChat({ partnerName }: { partnerName: string }) {
+  const [open, setOpen]     = useState(false);
+  const [msgs, setMsgs]     = useState<PreMessage[]>([
+    {
+      text: `Hi! I'd love to swap — I can teach ${partnerName === 'Lina' ? 'Meal Prep & Nutrition' : 'my skills'}. What works for your schedule?`,
+      fromMe: false,
+      time: new Date(Date.now() - 3_600_000).toISOString(),
+    },
+  ]);
+  const [draft, setDraft]   = useState('');
+  const scrollRef           = React.useRef<ScrollView>(null);
+
+  function send() {
+    const trimmed = draft.trim();
+    if (!trimmed) return;
+    setMsgs(prev => [...prev, { text: trimmed, fromMe: true, time: new Date().toISOString() }]);
+    setDraft('');
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+  }
+
+  return (
+    <View style={pt.wrapper}>
+      <Pressable
+        onPress={() => setOpen(o => !o)}
+        style={({ pressed }) => [pt.toggle, pressed && { opacity: 0.75 }]}
+        accessibilityRole="button"
+        accessibilityLabel={open ? 'Hide messages' : 'Message before deciding'}
+      >
+        <Text style={pt.toggleIcon}>{open ? '▲' : '💬'}</Text>
+        <Text style={pt.toggleText}>
+          {open ? 'Hide chat' : `Message ${partnerName} before deciding`}
+        </Text>
+      </Pressable>
+
+      {open && (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={120}
+        >
+          <View style={pt.panel}>
+            <ScrollView
+              ref={scrollRef}
+              style={pt.log}
+              contentContainerStyle={{ gap: 8, paddingBottom: 4 }}
+              showsVerticalScrollIndicator={false}
+              onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
+            >
+              {msgs.map((m, i) => (
+                <View key={i} style={[pt.bubble, m.fromMe ? pt.bubbleMe : pt.bubbleThem]}>
+                  <Text style={pt.bubbleMeta}>
+                    {m.fromMe ? 'You' : partnerName}
+                    {' · '}
+                    {new Date(m.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                  </Text>
+                  <Text style={pt.bubbleText}>{m.text}</Text>
+                </View>
+              ))}
+            </ScrollView>
+
+            <View style={pt.inputRow}>
+              <TextInput
+                style={pt.input}
+                value={draft}
+                onChangeText={setDraft}
+                placeholder={`Ask ${partnerName} about the trade…`}
+                placeholderTextColor="rgba(0,0,0,0.35)"
+                multiline
+                returnKeyType="send"
+                onSubmitEditing={send}
+                blurOnSubmit
+                accessibilityLabel="Message input"
+              />
+              <Pressable
+                onPress={send}
+                style={({ pressed }) => [
+                  pt.sendBtn,
+                  !draft.trim() && pt.sendBtnOff,
+                  pressed && draft.trim() && { opacity: 0.75 },
+                ]}
+                disabled={!draft.trim()}
+                accessibilityRole="button"
+                accessibilityLabel="Send"
+              >
+                <Text style={[pt.sendTxt, !draft.trim() && pt.sendTxtOff]}>↑</Text>
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      )}
+    </View>
+  );
+}
+
+const pt = StyleSheet.create({
+  wrapper:     { marginTop: 10, marginBottom: 4 },
+  toggle:      {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    alignSelf: 'flex-start', borderRadius: 8,
+    paddingVertical: 7, paddingHorizontal: 12,
+    backgroundColor: 'rgba(97,216,204,0.18)',
+    borderWidth: 1, borderColor: C.teal,
+  },
+  toggleIcon:  { fontSize: 14 },
+  toggleText:  { fontSize: 12, fontWeight: '700', color: C.tealDark },
+  panel:       {
+    marginTop: 10, borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.45)',
+    borderWidth: 1, borderColor: C.glassBorder,
+    overflow: 'hidden',
+  },
+  log:         { maxHeight: 200, paddingHorizontal: 10, paddingTop: 10 },
+  bubble:      { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, maxWidth: '88%' },
+  bubbleMe:    { backgroundColor: 'rgba(42,135,128,0.15)', alignSelf: 'flex-end' },
+  bubbleThem:  { backgroundColor: 'rgba(0,0,0,0.06)',     alignSelf: 'flex-start' },
+  bubbleMeta:  { fontSize: 10, color: C.blackSoft, marginBottom: 3, fontWeight: '600' },
+  bubbleText:  { fontSize: 13, color: C.blackMid, lineHeight: 18 },
+  inputRow:    {
+    flexDirection: 'row', alignItems: 'flex-end',
+    paddingHorizontal: 10, paddingVertical: 8,
+    borderTopWidth: 1, borderColor: C.glassBorder, gap: 8,
+  },
+  input:       {
+    flex: 1, borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    borderWidth: 1, borderColor: C.glassBorder,
+    paddingHorizontal: 12, paddingVertical: 8,
+    fontSize: 13, color: C.black,
+    maxHeight: 80, minHeight: 36,
+  },
+  sendBtn:     {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: C.tealDark,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  sendBtnOff:  { backgroundColor: 'rgba(0,0,0,0.1)' },
+  sendTxt:     { fontSize: 18, color: '#fff', fontWeight: '900', lineHeight: 22 },
+  sendTxtOff:  { color: 'rgba(0,0,0,0.3)' },
+});
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
 export default function IncomingScreen() {
   const [dismissed, setDismissed] = useState<string[]>([]);
 
@@ -135,6 +280,11 @@ export default function IncomingScreen() {
                 </View>
               </View>
 
+              {/* Pre-trade chat — message them before deciding */}
+              <PreTradeChat partnerName={user.name} />
+
+              <View style={s.divider} />
+
               <View style={s.actionRow}>
                 <Pressable
                   onPress={() => handleDecline(user.id)}
@@ -181,12 +331,13 @@ const s = StyleSheet.create({
   scoreText:      { fontSize: 13, color: C.blackSoft, marginTop: 2 },
   scoreBtn:       { borderRadius: 8, paddingVertical: 6, paddingHorizontal: 12, backgroundColor: 'rgba(97,216,204,0.25)', borderWidth: 1, borderColor: C.teal },
   scoreBtnText:   { fontSize: 12, fontWeight: '700', color: C.tealDark },
-  swapRow:        { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 16 },
+  swapRow:        { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 12 },
   swapCol:        { flex: 1, gap: 4 },
   swapLabel:      { fontSize: 11, fontWeight: '800', color: C.blackSoft, letterSpacing: 0.6, marginBottom: 4 },
   skill:          { fontSize: 13, fontWeight: '600', color: C.tealDark },
   skillMuted:     { fontSize: 12, color: C.blackSoft, fontStyle: 'italic' },
   swapArrow:      { fontSize: 22, color: C.blackSoft, marginTop: 20 },
+  divider:        { height: 1, backgroundColor: 'rgba(0,0,0,0.08)', marginVertical: 14 },
   actionRow:      { flexDirection: 'row', gap: 10 },
   declineBtn:     { flex: 1, borderRadius: 8, paddingVertical: 12, alignItems: 'center', backgroundColor: 'rgba(239,118,122,0.18)', borderWidth: 1, borderColor: 'rgba(239,118,122,0.5)' },
   declineBtnText: { fontSize: 14, fontWeight: '700', color: C.red },
