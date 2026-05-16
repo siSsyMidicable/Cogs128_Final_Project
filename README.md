@@ -159,3 +159,131 @@ client/
 - `expo-router` in `package.json` lists `6.0.23` but Expo 54 ships with `~4.x`. Run `npx expo install expo-router` after cloning to auto-fix this.
 - `react: 19.1.0` with `react-native: 0.81.5` is on the bleeding edge of the New Architecture. If you see random hook errors, try downgrading React to `18.3.x`.
 - There is no backend. All state is in-memory (auth, matches, history). Refreshing the app resets everything — this is intentional for the demo.
+
+---
+
+## 🔄 Git Guide — For Non-Technical Team Members
+
+Not used to the terminal? This section explains everything you need to know to sync code with the team. No experience required.
+
+### What Is Git?
+
+Git is the tool that lets everyone on the team share code changes without overwriting each other's work. Think of it like a **shared Google Doc with a full edit history** — except for code.
+
+- **GitHub** = the shared cloud copy (what everyone sees at this URL)
+- **Your laptop** = your personal local copy
+
+---
+
+### The 4 Things You'll Do
+
+#### 📥 1. `pull` — Get the latest code from the cloud
+
+Someone on your team pushed new code to GitHub. Pull it down so your laptop has the latest version.
+
+```bash
+git pull origin main
+```
+
+> Do this **first thing** before you start working each day.
+
+---
+
+#### 🎒 2. `add` — Choose which files to save
+
+You made some edits. Tell Git which files to include in your next save.
+
+```bash
+git add .
+```
+
+The `.` means "everything I changed." You can also name one specific file:
+
+```bash
+git add app/transaction/index.tsx
+```
+
+---
+
+#### 📸 3. `commit` — Save a snapshot of your work
+
+This locks in your changes with a short message. It saves to **your laptop only** — the cloud doesn't know yet.
+
+```bash
+git commit -m "describe what you changed here"
+```
+
+Good examples:
+```bash
+git commit -m "fix: transaction screen crash"
+git commit -m "feat: add accept button to incoming screen"
+git commit -m "style: update colors on hub screen"
+```
+
+---
+
+#### 📤 4. `push` — Send your work up to the cloud
+
+Your commit is saved locally. Now upload it to GitHub so teammates can see it.
+
+```bash
+git push origin main
+```
+
+---
+
+### The Full Flow (Every Time You Work)
+
+```
+pull → make edits → add → commit → push
+```
+
+| Step | Command | What it does |
+|------|---------|--------------|
+| Get latest | `git pull origin main` | Downloads newest code from GitHub |
+| Stage files | `git add .` | Picks which files to save |
+| Save snapshot | `git commit -m "message"` | Saves to your laptop with a label |
+| Upload | `git push origin main` | Sends to GitHub for the team |
+
+---
+
+### Someone Else Already Pushed — Do I Push Too?
+
+**No.** If a teammate already pushed changes to GitHub, you just need to pull:
+
+```bash
+git pull origin main
+```
+
+Then reload Expo by pressing **`r`** in the Metro terminal. You only `push` when *you* made changes on your own laptop.
+
+---
+
+### Quick Reload Cheat Sheet
+
+| Situation | What to do |
+|-----------|-----------|
+| Pulled new code from GitHub | Press `r` in the Metro terminal |
+| Changed a file locally | Expo usually reloads automatically |
+| Something looks frozen | Press `r` to force reload |
+| Really broken | Press `Ctrl+C` to stop, then run `npx expo start` again |
+
+---
+
+### Common Problems
+
+**"Command not found: npx"**
+→ Node.js isn't installed. Go to [nodejs.org](https://nodejs.org) and install the LTS version.
+
+**"Cannot connect to Metro"**
+→ Make sure your phone and computer are on the same Wi-Fi. Try pressing `r` in the terminal.
+
+**"Merge conflict"**
+→ You and a teammate edited the same file at the same time. Ask your team who should keep their version, or reach out for help — don't panic, nothing is deleted.
+
+**App crashes on a screen**
+→ Pull the latest code first (`git pull origin main`), then reload (`r`).
+
+---
+
+*Built for COGS 128 — UC Merced*
