@@ -16,7 +16,6 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_WIDTH = Math.min(SCREEN_WIDTH - 56, 340);
 const CARD_SIDE_PADDING = (SCREEN_WIDTH - CARD_WIDTH) / 2;
 
-// ─── Carousel now shows the 3 How-It-Works steps ─────────────────────────────
 const CARDS = [
   {
     id: "1",
@@ -44,45 +43,22 @@ const CARDS = [
   },
 ];
 
-// ─── How It Works header (above carousel) ────────────────────────────────────
-function HowItWorksHeader() {
-  return (
-    <View style={howStyles.container}>
-      <Text style={howStyles.heading}>How SkillSwap Works</Text>
-      <Text style={howStyles.tagline}>Offer first, then browse, then act.</Text>
-    </View>
-  );
-}
-
-// ─── Memory chips (below Get Started button) ─────────────────────────────────
-function MemoryChips() {
-  return (
-    <View style={howStyles.memoryRow}>
-      {["Offer", "Browse", "Request"].map((word, i) => (
-        <React.Fragment key={word}>
-          <View style={howStyles.chip}>
-            <Text style={howStyles.chipText}>{word}</Text>
-          </View>
-          {i < 2 && <Text style={howStyles.chipArrow}>→</Text>}
-        </React.Fragment>
-      ))}
-    </View>
-  );
-}
-
 // ─── Step card ────────────────────────────────────────────────────────────────
+// isActive controls whether the step badge is highlighted or dimmed.
 function StepCard({
   step,
   title,
   description,
   tilt,
   color,
+  isActive,
 }: {
   step: string;
   title: string;
   description: string;
   tilt: string;
   color: string;
+  isActive: boolean;
 }) {
   return (
     <View style={[styles.cardWrapper, { width: CARD_WIDTH }]}>
@@ -90,9 +66,21 @@ function StepCard({
         <View style={[styles.cardGlow, styles.cardGlowOne]} />
         <View style={[styles.cardGlow, styles.cardGlowTwo]} />
         <View style={[styles.infoCard, { transform: [{ rotate: tilt }] }]}>
-          {/* Step badge */}
-          <View style={[stepCardStyles.badge, { backgroundColor: color }]}>
-            <Text style={stepCardStyles.badgeNum}>{step}</Text>
+          {/* Badge: full colour when active, faded when not */}
+          <View
+            style={[
+              stepCardStyles.badge,
+              { backgroundColor: isActive ? color : "rgba(0,0,0,0.12)" },
+            ]}
+          >
+            <Text
+              style={[
+                stepCardStyles.badgeNum,
+                { color: isActive ? "#fff" : "rgba(0,0,0,0.35)" },
+              ]}
+            >
+              {step}
+            </Text>
           </View>
           <Text style={styles.cardTitle}>{title}</Text>
           <Text style={styles.cardDescription}>{description}</Text>
@@ -103,29 +91,20 @@ function StepCard({
 }
 
 // ─── Dot indicators ───────────────────────────────────────────────────────────
-function DotIndicators({
-  count,
-  activeIndex,
-}: {
-  count: number;
-  activeIndex: number;
-}) {
+function DotIndicators({ count, activeIndex }: { count: number; activeIndex: number }) {
   return (
     <View style={styles.dotsRow}>
       {Array.from({ length: count }).map((_, i) => (
         <View
           key={i}
-          style={[
-            styles.dot,
-            i === activeIndex ? styles.dotActive : styles.dotInactive,
-          ]}
+          style={[styles.dot, i === activeIndex ? styles.dotActive : styles.dotInactive]}
         />
       ))}
     </View>
   );
 }
 
-// ─── Carousel with prev / next arrow buttons ──────────────────────────────────
+// ─── Carousel ───────────────────────────────────────────────────────────────────
 function StepCarousel() {
   const [activeIndex, setActiveIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
@@ -139,9 +118,7 @@ function StepCarousel() {
     []
   );
 
-  const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 60,
-  }).current;
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
 
   const goTo = (index: number) => {
     const clamped = Math.max(0, Math.min(CARDS.length - 1, index));
@@ -151,7 +128,6 @@ function StepCarousel() {
 
   return (
     <View style={styles.carouselSection}>
-      {/* Arrow row wraps the FlatList */}
       <View style={arrowStyles.row}>
         {/* Prev arrow */}
         <Pressable
@@ -168,7 +144,7 @@ function StepCarousel() {
           <Text style={[arrowStyles.arrowText, activeIndex === 0 && arrowStyles.arrowTextDisabled]}>‹</Text>
         </Pressable>
 
-        {/* FlatList */}
+        {/* Cards */}
         <View style={{ flex: 1 }}>
           <FlatList
             ref={flatListRef}
@@ -180,17 +156,15 @@ function StepCarousel() {
             snapToAlignment="center"
             decelerationRate="fast"
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{
-              paddingHorizontal: CARD_SIDE_PADDING,
-              gap: 16,
-            }}
-            renderItem={({ item }) => (
+            contentContainerStyle={{ paddingHorizontal: CARD_SIDE_PADDING, gap: 16 }}
+            renderItem={({ item, index }) => (
               <StepCard
                 step={item.step}
                 title={item.title}
                 description={item.description}
                 tilt={item.tilt}
                 color={item.color}
+                isActive={index === activeIndex}
               />
             )}
             onViewableItemsChanged={onViewableItemsChanged}
@@ -237,13 +211,10 @@ export default function IntroScreen() {
             <Text style={styles.subtitle}>Trade your skills, grow together</Text>
           </View>
 
-          {/* ① How It Works header — ABOVE carousel */}
-          <HowItWorksHeader />
-
-          {/* ② Carousel — now shows the 3 steps with prev/next arrows */}
+          {/* Carousel — 3 step cards with prev/next arrows */}
           <StepCarousel />
 
-          {/* ③ CTA Button */}
+          {/* CTA Button */}
           <Pressable
             onPress={() => router.replace("/auth/login")}
             style={({ pressed }) => [
@@ -260,60 +231,11 @@ export default function IntroScreen() {
               <Text style={styles.skipArrow}>›</Text>
             </View>
           </Pressable>
-
-          {/* ④ Memory chips — BELOW Get Started */}
-          <MemoryChips />
         </View>
       </View>
     </SafeAreaView>
   );
 }
-
-// ─── How It Works header + memory chip styles ─────────────────────────────────
-const howStyles = StyleSheet.create({
-  container: {
-    width: "100%",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    marginBottom: 12,
-  },
-  heading: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#000",
-    marginBottom: 2,
-    letterSpacing: 0.3,
-  },
-  tagline: {
-    fontSize: 12,
-    color: "rgba(0,0,0,0.55)",
-  },
-  // Memory chips
-  memoryRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: 14,
-  },
-  chip: {
-    backgroundColor: "rgba(1,105,111,0.12)",
-    borderRadius: 99,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: "rgba(1,105,111,0.25)",
-  },
-  chipText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#01696F",
-  },
-  chipArrow: {
-    fontSize: 12,
-    color: "#01696F",
-    fontWeight: "700",
-  },
-});
 
 // ─── Step card badge styles ───────────────────────────────────────────────────
 const stepCardStyles = StyleSheet.create({
@@ -333,7 +255,6 @@ const stepCardStyles = StyleSheet.create({
   badgeNum: {
     fontSize: 14,
     fontWeight: "800",
-    color: "#fff",
   },
 });
 
@@ -428,16 +349,12 @@ const styles = StyleSheet.create({
     color: "rgba(0,0,0,0.8)",
     textAlign: "center",
   },
-
-  // Carousel
   carouselSection: {
     width: "100%",
     alignItems: "center",
     marginBottom: 24,
   },
-  cardWrapper: {
-    // width set dynamically
-  },
+  cardWrapper: {},
   cardPerspective: {
     position: "relative",
   },
@@ -481,8 +398,6 @@ const styles = StyleSheet.create({
     color: "rgba(0,0,0,0.78)",
     lineHeight: 20,
   },
-
-  // Dots
   dotsRow: {
     flexDirection: "row",
     gap: 8,
@@ -503,8 +418,6 @@ const styles = StyleSheet.create({
     height: 8,
     backgroundColor: "rgba(0,0,0,0.25)",
   },
-
-  // Get Started button
   skipButtonContainer: {
     width: "100%",
     maxWidth: 240,
@@ -521,17 +434,9 @@ const styles = StyleSheet.create({
     bottom: -2,
     borderRadius: 10,
   },
-  skipGlowA: {
-    backgroundColor: "rgba(255,107,26,0.45)",
-  },
-  skipGlowB: {
-    backgroundColor: "rgba(255,140,66,0.45)",
-    transform: [{ scale: 1.03 }],
-  },
-  skipGlowC: {
-    backgroundColor: "rgba(255,163,102,0.35)",
-    transform: [{ scale: 1.06 }],
-  },
+  skipGlowA: { backgroundColor: "rgba(255,107,26,0.45)" },
+  skipGlowB: { backgroundColor: "rgba(255,140,66,0.45)", transform: [{ scale: 1.03 }] },
+  skipGlowC: { backgroundColor: "rgba(255,163,102,0.35)", transform: [{ scale: 1.06 }] },
   skipButton: {
     borderRadius: 8,
     paddingVertical: 14,
