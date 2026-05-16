@@ -16,10 +16,8 @@ import { router } from "expo-router";
 import { loginInputSchema, useLogin } from "@/lib/auth/auth";
 import { useDisclosure } from "@/hooks/use-disclosure";
 
-const defaultValues =
-  Platform.OS === "ios"
-    ? { email: "user1@demo.com", password: "password" }
-    : { email: "user2@demo.com", password: "password" };
+// ─── Demo credentials — same email on both platforms ─────────────────────────
+const defaultValues = { email: "si$sy@demo.com", password: "password" };
 
 export const LoginForm = () => {
   const { isOpen: passwordVisible, onToggle: togglePasswordVisibility } =
@@ -42,7 +40,6 @@ export const LoginForm = () => {
     setServerError(null);
     try {
       await login.mutate(values);
-      // Only navigate once login has fully resolved
       router.replace("/transaction");
     } catch (err: unknown) {
       const msg =
@@ -82,7 +79,6 @@ export const LoginForm = () => {
                 Enter your email and password to continue.
               </Text>
 
-              {/* Server error banner */}
               {serverError && (
                 <View style={styles.errorBanner}>
                   <Text style={styles.errorBannerText}>{serverError}</Text>
@@ -194,14 +190,14 @@ export const LoginForm = () => {
                 </Pressable>
               </View>
 
-              {/* Register link */}
+              {/* Register link — navigates to /auth/register */}
               <Pressable
                 onPress={() => router.push("/auth/register")}
                 accessibilityLabel="Create a new account"
                 accessibilityRole="link"
               >
                 <Text style={styles.registerLink}>
-                  Don’t have an account?{" "}
+                  Don't have an account?{" "}
                   <Text style={styles.registerLinkBold}>Register</Text>
                 </Text>
               </Pressable>

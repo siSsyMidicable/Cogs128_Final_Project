@@ -1,3 +1,9 @@
+/**
+ * Intro / Skill Swap landing screen
+ * – Infinite looping carousel (cards wrap around seamlessly)
+ * – Natural spring settle: tension 38, friction 7 — lazy drift, one soft overshoot
+ * – Floating glass-island theme matching all other screens
+ */
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -20,7 +26,7 @@ const CARD_GAP     = 20;
 const CARD_STEP    = CARD_WIDTH + CARD_GAP;
 const SIDE_PADDING = (SCREEN_WIDTH - CARD_WIDTH) / 2 - H_PAD;
 
-const CARDS = [
+const BASE_CARDS = [
   {
     id: "1", step: "1", title: "List a Skill",
     description: "Share what you can teach — coding, cooking, design, anything. Your skill is your currency.",
@@ -38,27 +44,45 @@ const CARDS = [
   },
 ];
 
-// ─── Natural spring settle ──────────────────────────────────────────────────
-// Single underdamped spring from an offset to 0.
-// tension=60, friction=6 gives a natural settle — not scripted, not forced.
+// Infinite-loop data: clone cards before + after real list
+const LOOP_COUNT = 3; // clones per side
+const LOOPED_CARDS = [
+  ...BASE_CARDS.slice(-LOOP_COUNT).map((c, i) => ({ ...c, id: `pre-${i}` })),
+  ...BASE_CARDS,
+  ...BASE_CARDS.slice(0, LOOP_COUNT).map((c, i) => ({ ...c, id: `post-${i}` })),
+];
+const REAL_OFFSET = LOOP_COUNT; // index where real cards start in LOOPED_CARDS
+const REAL_LEN    = BASE_CARDS.length;
+
+// ─── Fluid spring: lazy drift, one soft overshoot — not rigid ────────────────
 function useSettleAnim() {
   const anim   = useRef(new Animated.Value(0)).current;
   const spring = useRef<Animated.CompositeAnimation | null>(null);
+  const scale  = useRef(new Animated.Value(1)).current;
 
   const trigger = useCallback((fromDir: 'left' | 'right' = 'right') => {
     spring.current?.stop();
-    anim.setValue(fromDir === 'right' ? 12 : -12);
-    spring.current = Animated.spring(anim, {
-      toValue: 0,
-      useNativeDriver: true,
-      tension: 60,
-      friction: 6,
-      velocity: 0,
-    });
+    anim.setValue(fromDir === 'right' ? 14 : -14);
+    scale.setValue(0.97);
+    spring.current = Animated.parallel([
+      Animated.spring(anim, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 38,   // low tension = card drifts lazily to rest
+        friction: 7,   // slight underdamp = one organic overshoot, then settles
+        velocity: 0,
+      }),
+      Animated.spring(scale, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 42,
+        friction: 8,
+      }),
+    ]);
     spring.current.start();
-  }, [anim]);
+  }, [anim, scale]);
 
-  return { anim, trigger };
+  return { anim, scale, trigger };
 }
 
 // ─── Step card ────────────────────────────────────────────────────────────────
@@ -69,7 +93,7 @@ function StepCard({
   tilt: string; color: string; isActive: boolean;
   swipeDir: 'left' | 'right';
 }) {
-  const { anim, trigger } = useSettleAnim();
+  const { anim, scale, trigger } = useSettleAnim();
   const wasActive = useRef(false);
 
   useEffect(() => {
@@ -86,7 +110,7 @@ function StepCard({
       <Animated.View
         style={[
           styles.cardPerspective,
-          isActive ? { transform: [{ translateX: anim }] } : undefined,
+          isActive ? { transform: [{ translateX: anim }, { scale }] } : undefined,
         ]}
       >
         <View style={styles.cardGlow} />
@@ -111,7 +135,7 @@ function StepCard({
   );
 }
 
-// ─── Dot indicators ───────────────────────────────────────────────────────────
+// ─── Dot indicators (based on real card count only) ───────────────────────────
 function DotIndicators({ count, activeIndex }: { count: number; activeIndex: number }) {
   return (
     <View style={styles.dotsRow}>
@@ -122,52 +146,76 @@ function DotIndicators({ count, activeIndex }: { count: number; activeIndex: num
   );
 }
 
-// ─── Carousel ────────────────────────────────────────────────────────────────
+// ─── Infinite carousel ───────────────────────────────────────────────────────
 function StepCarousel() {
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [prevIndex,   setPrevIndex]   = useState(0);
+  const [activeLooped, setActiveLooped] = useState(REAL_OFFSET);
+  const [prevLooped,   setPrevLooped]   = useState(REAL_OFFSET);
   const flatListRef = useRef<FlatList>(null);
+  const isJumping   = useRef(false);
+
+  // Real card index (0-based, for dots)
+  const realIndex = ((activeLooped - REAL_OFFSET) % REAL_LEN + REAL_LEN) % REAL_LEN;
+
+  // Jump to real position after looping past a clone
+  function maybeLoop(rawIndex: number) {
+    let target: number | null = null;
+    if (rawIndex < REAL_OFFSET)                      target = rawIndex + REAL_LEN;
+    else if (rawIndex >= REAL_OFFSET + REAL_LEN)     target = rawIndex - REAL_LEN;
+    if (target !== null && !isJumping.current) {
+      isJumping.current = true;
+      flatListRef.current?.scrollToIndex({ index: target, animated: false });
+      setActiveLooped(target);
+      setPrevLooped(target);
+      setTimeout(() => { isJumping.current = false; }, 80);
+    }
+  }
 
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      if (isJumping.current) return;
       if (viewableItems.length > 0 && viewableItems[0].index !== null) {
         const next = viewableItems[0].index!;
-        setActiveIndex(prev => { setPrevIndex(prev); return next; });
+        setActiveLooped(prev => { setPrevLooped(prev); return next; });
+        maybeLoop(next);
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
-  const swipeDir = activeIndex >= prevIndex ? 'right' : 'left';
+  const swipeDir = activeLooped >= prevLooped ? 'right' : 'left';
 
-  const goTo = (index: number) => {
-    const clamped = Math.max(0, Math.min(CARDS.length - 1, index));
-    setPrevIndex(activeIndex);
+  // Start at real first card (skip pre-clones)
+  useEffect(() => {
+    flatListRef.current?.scrollToIndex({ index: REAL_OFFSET, animated: false });
+  }, []);
+
+  function goTo(delta: number) {
+    if (isJumping.current) return;
+    const next = activeLooped + delta;
+    const clamped = Math.max(0, Math.min(LOOPED_CARDS.length - 1, next));
+    setPrevLooped(activeLooped);
     flatListRef.current?.scrollToIndex({ index: clamped, animated: true });
-    setActiveIndex(clamped);
-  };
+    setActiveLooped(clamped);
+    setTimeout(() => maybeLoop(clamped), 350);
+  }
 
   return (
     <View style={styles.carouselSection}>
       <View style={styles.arrowRow}>
         <Pressable
-          onPress={() => goTo(activeIndex - 1)}
-          style={({ pressed }) => [
-            arrowStyles.arrowBtn,
-            activeIndex === 0 && arrowStyles.arrowBtnDisabled,
-            pressed && arrowStyles.arrowBtnPressed,
-          ]}
-          disabled={activeIndex === 0}
-          accessibilityLabel="Previous step" accessibilityRole="button"
+          onPress={() => goTo(-1)}
+          style={({ pressed }) => [arrowStyles.arrowBtn, pressed && arrowStyles.arrowBtnPressed]}
+          accessibilityLabel="Previous" accessibilityRole="button"
         >
-          <Text style={[arrowStyles.arrowText, activeIndex === 0 && arrowStyles.arrowTextDisabled]}>‹</Text>
+          <Text style={arrowStyles.arrowText}>‹</Text>
         </Pressable>
 
         <View style={styles.carouselScrollView}>
           <FlatList
             ref={flatListRef}
-            data={CARDS}
+            data={LOOPED_CARDS}
             keyExtractor={(item) => item.id}
             horizontal
             pagingEnabled={false}
@@ -176,11 +224,16 @@ function StepCarousel() {
             decelerationRate="fast"
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: SIDE_PADDING, paddingVertical: 18, gap: 0 }}
+            getItemLayout={(_, index) => ({
+              length: CARD_STEP + H_PAD * 2,
+              offset: (CARD_STEP + H_PAD * 2) * index,
+              index,
+            })}
             renderItem={({ item, index }) => (
               <StepCard
                 step={item.step} title={item.title}
                 description={item.description} tilt={item.tilt}
-                color={item.color} isActive={index === activeIndex}
+                color={item.color} isActive={index === activeLooped}
                 swipeDir={swipeDir}
               />
             )}
@@ -190,19 +243,14 @@ function StepCarousel() {
         </View>
 
         <Pressable
-          onPress={() => goTo(activeIndex + 1)}
-          style={({ pressed }) => [
-            arrowStyles.arrowBtn,
-            activeIndex === CARDS.length - 1 && arrowStyles.arrowBtnDisabled,
-            pressed && arrowStyles.arrowBtnPressed,
-          ]}
-          disabled={activeIndex === CARDS.length - 1}
-          accessibilityLabel="Next step" accessibilityRole="button"
+          onPress={() => goTo(1)}
+          style={({ pressed }) => [arrowStyles.arrowBtn, pressed && arrowStyles.arrowBtnPressed]}
+          accessibilityLabel="Next" accessibilityRole="button"
         >
-          <Text style={[arrowStyles.arrowText, activeIndex === CARDS.length - 1 && arrowStyles.arrowTextDisabled]}>›</Text>
+          <Text style={arrowStyles.arrowText}>›</Text>
         </Pressable>
       </View>
-      <DotIndicators count={CARDS.length} activeIndex={activeIndex} />
+      <DotIndicators count={REAL_LEN} activeIndex={realIndex} />
     </View>
   );
 }
@@ -248,12 +296,9 @@ const stepCardStyles = StyleSheet.create({
 });
 
 const arrowStyles = StyleSheet.create({
-  row:               { flexDirection: "row", alignItems: "center", width: "100%" },
-  arrowBtn:          { width: 36, height: 44, alignItems: "center", justifyContent: "center" },
-  arrowBtnDisabled:  { opacity: 0.25 },
-  arrowBtnPressed:   { opacity: 0.6 },
-  arrowText:         { fontSize: 30, fontWeight: "900", color: "#01696F", lineHeight: 34 },
-  arrowTextDisabled: { color: "rgba(0,0,0,0.3)" },
+  arrowBtn:         { width: 36, height: 44, alignItems: "center", justifyContent: "center" },
+  arrowBtnPressed:  { opacity: 0.6 },
+  arrowText:        { fontSize: 30, fontWeight: "900", color: "#01696F", lineHeight: 34 },
 });
 
 const styles = StyleSheet.create({

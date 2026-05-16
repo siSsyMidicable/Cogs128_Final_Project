@@ -1,18 +1,28 @@
 /**
  * /transaction/ongoing
- * Active swaps — Jasmine and Kevin are already connected.
- * Each card has an interactive check-in panel: view log + send a new message.
+ * – Cards now live inside an infinite-loop horizontal carousel
+ * – Last card has an expanded interactive check-in panel (auto-open)
+ * – Floating glass-island theme — same as every other screen
  */
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, KeyboardAvoidingView,
-  Pressable, StatusBar, TextInput, Platform, Animated,
+  View, Text, StyleSheet, KeyboardAvoidingView,
+  Pressable, StatusBar, TextInput, Platform,
+  Animated, Dimensions, FlatList, ViewToken,
 } from 'react-native';
+import { ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { router } from 'expo-router';
 import { MOCK_USERS, ACTIVE_SWAPS, type ActiveSwapMeta } from '@/lib/matching/data';
 import { getMatchingState } from '@/lib/matching/matching';
+
+const { width: SW } = Dimensions.get('window');
+const CARD_W   = Math.min(SW - 64, 320);
+const H_PAD    = 10;
+const CARD_GAP = 16;
+const CARD_STEP = CARD_W + CARD_GAP;
+const SIDE_PAD  = (SW - CARD_W) / 2 - H_PAD;
 
 const C = {
   bg: '#7DE5E5', bgDeep: '#8FEBE5',
@@ -22,22 +32,6 @@ const C = {
   teal: '#61d8cc', tealDark: '#2a8780',
   orange: '#FF8C42', shadow: '#000',
 };
-
-function Island({ children }: { children: React.ReactNode }) {
-  return (
-    <View style={isl.outer}>
-      <View style={isl.glowOne} />
-      <View style={isl.glowTwo} />
-      <View style={isl.inner}>{children}</View>
-    </View>
-  );
-}
-const isl = StyleSheet.create({
-  outer:   { paddingVertical: 14, overflow: 'visible' },
-  glowOne: { position: 'absolute', left: 0, right: 0, top: 14, bottom: 14, borderRadius: 14, backgroundColor: C.glowOne, transform: [{ scale: 1.07 }] },
-  glowTwo: { position: 'absolute', left: 0, right: 0, top: 14, bottom: 14, borderRadius: 14, backgroundColor: C.glowTwo, transform: [{ scale: 1.12 }] },
-  inner:   { borderRadius: 12, padding: 16, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassBorder, shadowColor: C.shadow, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.20, shadowRadius: 14, elevation: 8 },
-});
 
 function BackIcon() {
   return (
@@ -55,30 +49,25 @@ function daysLeft(isoDate: string) {
   return         { label: `${d}d left`,                   color: d <= 3 ? C.orange : C.teal };
 }
 
-// ─── Per-card in-memory check-in log ─────────────────────────────────────────────────
-// Seeded from ACTIVE_SWAPS. New messages appended by user input.
+// ─── Check-in panel ───────────────────────────────────────────────────────────
 type CheckIn = { date: string; note: string; fromMe: boolean };
 
 function CheckInPanel({
-  userId, meta,
+  meta, autoOpen,
 }: {
-  userId: string;
   meta: ActiveSwapMeta;
+  autoOpen?: boolean;
 }) {
-  const [log, setLog]   = useState<CheckIn[]>(meta.checkIns);
+  const [log,  setLog]  = useState<CheckIn[]>(meta.checkIns);
   const [text, setText] = useState('');
-  const [open, setOpen] = useState(false);
-  const scrollRef       = React.useRef<ScrollView>(null);
+  const [open, setOpen] = useState(!!autoOpen);
+  const scrollRef       = useRef<ScrollView>(null);
 
   function send() {
     const trimmed = text.trim();
     if (!trimmed) return;
-    setLog(prev => [
-      ...prev,
-      { date: new Date().toISOString(), note: trimmed, fromMe: true },
-    ]);
+    setLog(prev => [...prev, { date: new Date().toISOString(), note: trimmed, fromMe: true }]);
     setText('');
-    // Scroll to bottom after state updates
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
   }
 
@@ -86,7 +75,6 @@ function CheckInPanel({
 
   return (
     <View style={ci.wrapper}>
-      {/* Toggle button */}
       <Pressable
         onPress={() => setOpen(o => !o)}
         style={({ pressed }) => [ci.toggle, pressed && { opacity: 0.75 }]}
@@ -97,15 +85,12 @@ function CheckInPanel({
           {open ? '▲ Hide check-ins' : `▼ ${log.length} check-in${log.length !== 1 ? 's' : ''}`}
         </Text>
         {!open && lastNote && (
-          <Text style={ci.lastPreview} numberOfLines={1}>
-            “{lastNote.note}”
-          </Text>
+          <Text style={ci.lastPreview} numberOfLines={1}>"{lastNote.note}"</Text>
         )}
       </Pressable>
 
       {open && (
         <View style={ci.panel}>
-          {/* Message log */}
           <ScrollView
             ref={scrollRef}
             style={ci.log}
@@ -113,28 +98,21 @@ function CheckInPanel({
             showsVerticalScrollIndicator={false}
             onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
           >
-            {log.map((ci_item, i) => (
-              <View
-                key={i}
-                style={[
-                  ci.bubble,
-                  ci_item.fromMe ? ci.bubbleMe : ci.bubbleThem,
-                ]}
-              >
+            {log.map((item, i) => (
+              <View key={i} style={[ci.bubble, item.fromMe ? ci.bubbleMe : ci.bubbleThem]}>
                 <Text style={ci.bubbleDate}>
-                  {ci_item.fromMe ? 'You' : meta.theyGive.split(' ')[0]}
+                  {item.fromMe ? 'You' : meta.theyGive.split(' ')[0]}
                   {' · '}
-                  {new Date(ci_item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  {new Date(ci_item.date).getTime() > Date.now() - 86_400_000 * 1
-                    ? ' · ' + new Date(ci_item.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                  {new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  {new Date(item.date).getTime() > Date.now() - 86_400_000
+                    ? ' · ' + new Date(item.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
                     : ''}
                 </Text>
-                <Text style={ci.bubbleText}>{ci_item.note}</Text>
+                <Text style={ci.bubbleText}>{item.note}</Text>
               </View>
             ))}
           </ScrollView>
 
-          {/* Input row */}
           <View style={ci.inputRow}>
             <TextInput
               style={ci.input}
@@ -150,11 +128,7 @@ function CheckInPanel({
             />
             <Pressable
               onPress={send}
-              style={({ pressed }) => [
-                ci.sendBtn,
-                !text.trim() && ci.sendBtnOff,
-                pressed && text.trim() && { opacity: 0.75 },
-              ]}
+              style={({ pressed }) => [ci.sendBtn, !text.trim() && ci.sendBtnOff, pressed && text.trim() && { opacity: 0.75 }]}
               disabled={!text.trim()}
               accessibilityRole="button"
               accessibilityLabel="Send"
@@ -169,59 +143,218 @@ function CheckInPanel({
 }
 
 const ci = StyleSheet.create({
-  wrapper:      { marginTop: 4 },
-  toggle:       {
-    alignSelf: 'flex-start', borderRadius: 8,
-    paddingVertical: 7, paddingHorizontal: 12,
-    backgroundColor: 'rgba(97,216,204,0.2)',
-    borderWidth: 1, borderColor: C.teal,
-    gap: 2,
-  },
-  toggleText:   { fontSize: 12, fontWeight: '700', color: C.tealDark },
-  lastPreview:  { fontSize: 11, color: C.blackSoft, maxWidth: 220, fontStyle: 'italic' },
-  panel:        {
-    marginTop: 10, borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.45)',
-    borderWidth: 1, borderColor: C.glassBorder,
-    overflow: 'hidden',
-  },
-  log:          { maxHeight: 220, paddingHorizontal: 10, paddingTop: 10 },
-  bubble:       { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, maxWidth: '88%' },
-  bubbleMe:     { backgroundColor: 'rgba(42,135,128,0.15)', alignSelf: 'flex-end' },
-  bubbleThem:   { backgroundColor: 'rgba(0,0,0,0.06)',     alignSelf: 'flex-start' },
-  bubbleDate:   { fontSize: 10, color: C.blackSoft, marginBottom: 3, fontWeight: '600' },
-  bubbleText:   { fontSize: 13, color: C.blackMid, lineHeight: 18 },
-  inputRow:     {
-    flexDirection: 'row', alignItems: 'flex-end',
-    paddingHorizontal: 10, paddingVertical: 8,
-    borderTopWidth: 1, borderColor: C.glassBorder, gap: 8,
-  },
-  input:        {
-    flex: 1, borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.7)',
-    borderWidth: 1, borderColor: C.glassBorder,
-    paddingHorizontal: 12, paddingVertical: 8,
-    fontSize: 13, color: C.black,
-    maxHeight: 80, minHeight: 36,
-  },
-  sendBtn:      {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: C.tealDark,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  sendBtnOff:   { backgroundColor: 'rgba(0,0,0,0.1)' },
-  sendTxt:      { fontSize: 18, color: '#fff', fontWeight: '900', lineHeight: 22 },
-  sendTxtOff:   { color: 'rgba(0,0,0,0.3)' },
+  wrapper:    { marginTop: 4 },
+  toggle:     { alignSelf: 'flex-start', borderRadius: 8, paddingVertical: 7, paddingHorizontal: 12, backgroundColor: 'rgba(97,216,204,0.2)', borderWidth: 1, borderColor: C.teal, gap: 2 },
+  toggleText: { fontSize: 12, fontWeight: '700', color: C.tealDark },
+  lastPreview:{ fontSize: 11, color: C.blackSoft, maxWidth: 220, fontStyle: 'italic' },
+  panel:      { marginTop: 10, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.45)', borderWidth: 1, borderColor: C.glassBorder, overflow: 'hidden' },
+  log:        { maxHeight: 200, paddingHorizontal: 10, paddingTop: 10 },
+  bubble:     { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, maxWidth: '88%' },
+  bubbleMe:   { backgroundColor: 'rgba(42,135,128,0.15)', alignSelf: 'flex-end' },
+  bubbleThem: { backgroundColor: 'rgba(0,0,0,0.06)', alignSelf: 'flex-start' },
+  bubbleDate: { fontSize: 10, color: C.blackSoft, marginBottom: 3, fontWeight: '600' },
+  bubbleText: { fontSize: 13, color: C.blackMid, lineHeight: 18 },
+  inputRow:   { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 10, paddingVertical: 8, borderTopWidth: 1, borderColor: C.glassBorder, gap: 8 },
+  input:      { flex: 1, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.7)', borderWidth: 1, borderColor: C.glassBorder, paddingHorizontal: 12, paddingVertical: 8, fontSize: 13, color: C.black, maxHeight: 80, minHeight: 36 },
+  sendBtn:    { width: 36, height: 36, borderRadius: 18, backgroundColor: C.tealDark, alignItems: 'center', justifyContent: 'center' },
+  sendBtnOff: { backgroundColor: 'rgba(0,0,0,0.1)' },
+  sendTxt:    { fontSize: 18, color: '#fff', fontWeight: '900', lineHeight: 22 },
+  sendTxtOff: { color: 'rgba(0,0,0,0.3)' },
+});
+
+// ─── Individual swap card ─────────────────────────────────────────────────────
+type SwapItem = { user: (typeof MOCK_USERS)[0]; meta: ActiveSwapMeta | undefined; isLast: boolean };
+
+function SwapCard({ item, isActive }: { item: SwapItem; isActive: boolean }) {
+  const { user, meta, isLast } = item;
+  const dl = meta ? daysLeft(meta.deadlineIso) : null;
+
+  return (
+    <View style={[card.wrapper, { width: CARD_W + H_PAD * 2 }]}>
+      <View style={[card.glowBg, card.glowBgOne]} />
+      <View style={[card.glowBg, card.glowBgTwo]} />
+      <View style={[card.inner, !isActive && card.innerDim]}>
+        {/* Header */}
+        <View style={card.header}>
+          <View style={card.avatar}>
+            <Text style={card.avatarEmoji}>{user.avatar}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={card.name}>{user.name}</Text>
+            {meta && <Text style={card.swapLine}>{meta.youGive} ⇄ {meta.theyGive}</Text>}
+          </View>
+          {dl && (
+            <View style={[card.dlBadge, { backgroundColor: dl.color + '22', borderColor: dl.color }]}>
+              <Text style={[card.dlText, { color: dl.color }]}>{dl.label}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Agreed scope */}
+        {meta && (
+          <View style={card.scopeBox}>
+            <Text style={card.scopeLabel}>AGREED SCOPE</Text>
+            <Text style={card.scopeText}>{meta.agreedScope}</Text>
+          </View>
+        )}
+
+        {/* Check-in panel — last card auto-opens for demo */}
+        {meta && <CheckInPanel meta={meta} autoOpen={isLast} />}
+      </View>
+    </View>
+  );
+}
+
+const card = StyleSheet.create({
+  wrapper:    { paddingVertical: 14, paddingHorizontal: H_PAD, overflow: 'visible' },
+  glowBg:     { position: 'absolute', left: H_PAD, right: H_PAD, top: 14, bottom: 14, borderRadius: 14 },
+  glowBgOne:  { backgroundColor: C.glowOne, transform: [{ scale: 1.07 }] },
+  glowBgTwo:  { backgroundColor: C.glowTwo, transform: [{ scale: 1.12 }] },
+  inner:      { borderRadius: 12, padding: 16, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassBorder, shadowColor: C.shadow, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.20, shadowRadius: 14, elevation: 8, gap: 12 },
+  innerDim:   { opacity: 0.65 },
+  header:     { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  avatar:     { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.6)', borderWidth: 1.5, borderColor: C.glassBorder, alignItems: 'center', justifyContent: 'center' },
+  avatarEmoji:{ fontSize: 24 },
+  name:       { fontSize: 17, fontWeight: '800', color: C.black },
+  swapLine:   { fontSize: 13, color: C.blackSoft, marginTop: 2 },
+  dlBadge:    { borderRadius: 8, paddingVertical: 4, paddingHorizontal: 8, borderWidth: 1 },
+  dlText:     { fontSize: 12, fontWeight: '800' },
+  scopeBox:   { backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 8, padding: 10 },
+  scopeLabel: { fontSize: 9, fontWeight: '800', color: C.blackSoft, letterSpacing: 1.2, marginBottom: 4 },
+  scopeText:  { fontSize: 13, color: C.blackMid, lineHeight: 19 },
+});
+
+// ─── Infinite carousel ────────────────────────────────────────────────────────
+const LOOP = 3;
+
+function buildLooped(items: SwapItem[]) {
+  if (items.length === 0) return { data: [], offset: 0 };
+  const pre  = items.slice(-LOOP).map((it, i) => ({ ...it, _key: `pre-${i}` }));
+  const post = items.slice(0, LOOP).map((it, i) => ({ ...it, _key: `post-${i}` }));
+  return {
+    data: [...pre, ...items.map(it => ({ ...it, _key: it.user.id })), ...post],
+    offset: LOOP,
+  };
+}
+
+function OngoingCarousel({ items }: { items: SwapItem[] }) {
+  const { data, offset } = buildLooped(items);
+  const REAL = items.length;
+  const [active, setActive] = useState(offset);
+  const [prev,   setPrev]   = useState(offset);
+  const flatRef  = useRef<FlatList>(null);
+  const jumping  = useRef(false);
+
+  const realIdx = ((active - offset) % REAL + REAL) % REAL;
+
+  function maybeLoop(idx: number) {
+    let t: number | null = null;
+    if (idx < offset)              t = idx + REAL;
+    else if (idx >= offset + REAL) t = idx - REAL;
+    if (t !== null && !jumping.current) {
+      jumping.current = true;
+      flatRef.current?.scrollToIndex({ index: t, animated: false });
+      setActive(t); setPrev(t);
+      setTimeout(() => { jumping.current = false; }, 80);
+    }
+  }
+
+  const onViewable = useCallback(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      if (jumping.current) return;
+      if (viewableItems.length && viewableItems[0].index !== null) {
+        const n = viewableItems[0].index!;
+        setActive(p => { setPrev(p); return n; });
+        maybeLoop(n);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
+  const vcfg = useRef({ itemVisiblePercentThreshold: 60 }).current;
+
+  useEffect(() => {
+    flatRef.current?.scrollToIndex({ index: offset, animated: false });
+  }, [offset]);
+
+  function go(d: number) {
+    if (jumping.current) return;
+    const n = Math.max(0, Math.min(data.length - 1, active + d));
+    setPrev(active);
+    flatRef.current?.scrollToIndex({ index: n, animated: true });
+    setActive(n);
+    setTimeout(() => maybeLoop(n), 350);
+  }
+
+  return (
+    <View style={oc.container}>
+      <View style={oc.arrowRow}>
+        <Pressable onPress={() => go(-1)} style={({ pressed }) => [oc.arrow, pressed && { opacity: 0.6 }]}>
+          <Text style={oc.arrowTxt}>‹</Text>
+        </Pressable>
+
+        <View style={oc.listWrap}>
+          <FlatList
+            ref={flatRef}
+            data={data}
+            keyExtractor={(it) => it._key}
+            horizontal
+            pagingEnabled={false}
+            snapToInterval={CARD_STEP + H_PAD * 2}
+            snapToAlignment="center"
+            decelerationRate="fast"
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: SIDE_PAD, paddingVertical: 6 }}
+            getItemLayout={(_, i) => ({
+              length: CARD_STEP + H_PAD * 2,
+              offset: (CARD_STEP + H_PAD * 2) * i,
+              index: i,
+            })}
+            renderItem={({ item, index }) => (
+              <SwapCard item={item} isActive={index === active} />
+            )}
+            onViewableItemsChanged={onViewable}
+            viewabilityConfig={vcfg}
+          />
+        </View>
+
+        <Pressable onPress={() => go(1)} style={({ pressed }) => [oc.arrow, pressed && { opacity: 0.6 }]}>
+          <Text style={oc.arrowTxt}>›</Text>
+        </Pressable>
+      </View>
+
+      {/* Dots */}
+      <View style={oc.dots}>
+        {Array.from({ length: REAL }).map((_, i) => (
+          <View key={i} style={[oc.dot, i === realIdx ? oc.dotOn : oc.dotOff]} />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+const oc = StyleSheet.create({
+  container: { width: '100%', alignItems: 'center' },
+  arrowRow:  { flexDirection: 'row', alignItems: 'center', width: '100%', overflow: 'visible' },
+  arrow:     { width: 36, height: 44, alignItems: 'center', justifyContent: 'center' },
+  arrowTxt:  { fontSize: 30, fontWeight: '900', color: C.tealDark, lineHeight: 34 },
+  listWrap:  { flex: 1, overflow: 'visible' },
+  dots:      { flexDirection: 'row', gap: 8, marginTop: 8 },
+  dot:       { borderRadius: 99 },
+  dotOn:     { width: 22, height: 8, backgroundColor: C.black },
+  dotOff:    { width: 8,  height: 8, backgroundColor: 'rgba(0,0,0,0.25)' },
 });
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export default function OngoingScreen() {
   const { connections } = getMatchingState();
-  const active = MOCK_USERS
+  const active: SwapItem[] = MOCK_USERS
     .filter(u => connections.has(u.id))
-    .map(u => ({
+    .map((u, i, arr) => ({
       user: u,
       meta: ACTIVE_SWAPS.find(m => m.userId === u.id),
+      isLast: i === arr.length - 1,
     }));
 
   return (
@@ -234,7 +367,7 @@ export default function OngoingScreen() {
           <BackIcon />
           <Text style={s.backText}>Back</Text>
         </Pressable>
-        <Text style={s.navTitle}>Ongoing</Text>
+        <Text style={s.navTitle}>Ongoing Swaps</Text>
         <View style={{ width: 72 }} />
       </View>
 
@@ -245,46 +378,18 @@ export default function OngoingScreen() {
       >
         <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
           {active.length === 0 ? (
-            <Island>
-              <View style={s.emptyState}>
+            <View style={s.emptyWrap}>
+              <View style={[s.emptyGlowOne]} />
+              <View style={[s.emptyGlowTwo]} />
+              <View style={s.emptyCard}>
                 <Text style={s.emptyEmoji}>🔄</Text>
                 <Text style={s.emptyTitle}>No active swaps</Text>
                 <Text style={s.emptySub}>Accept an incoming request to start a swap.</Text>
               </View>
-            </Island>
-          ) : active.map(({ user, meta }) => {
-            const dl = meta ? daysLeft(meta.deadlineIso) : null;
-            return (
-              <Island key={user.id}>
-                {/* Header */}
-                <View style={s.cardHeader}>
-                  <View style={s.avatar}>
-                    <Text style={s.avatarEmoji}>{user.avatar}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.userName}>{user.name}</Text>
-                    {meta && <Text style={s.swapLine}>{meta.youGive} ⇄ {meta.theyGive}</Text>}
-                  </View>
-                  {dl && (
-                    <View style={[s.deadlineBadge, { backgroundColor: dl.color + '22', borderColor: dl.color }]}>
-                      <Text style={[s.deadlineText, { color: dl.color }]}>{dl.label}</Text>
-                    </View>
-                  )}
-                </View>
-
-                {/* Scope */}
-                {meta && (
-                  <View style={s.scopeBox}>
-                    <Text style={s.scopeLabel}>AGREED SCOPE</Text>
-                    <Text style={s.scopeText}>{meta.agreedScope}</Text>
-                  </View>
-                )}
-
-                {/* Interactive check-in panel */}
-                {meta && <CheckInPanel userId={user.id} meta={meta} />}
-              </Island>
-            );
-          })}
+            </View>
+          ) : (
+            <OngoingCarousel items={active} />
+          )}
           <View style={{ height: 32 }} />
         </ScrollView>
       </KeyboardAvoidingView>
@@ -293,25 +398,18 @@ export default function OngoingScreen() {
 }
 
 const s = StyleSheet.create({
-  safe:          { flex: 1, backgroundColor: C.bgDeep },
-  bgLayer:       { ...StyleSheet.absoluteFillObject, backgroundColor: C.bg },
-  nav:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10, zIndex: 2 },
-  backPill:      { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 20, paddingVertical: 7, paddingHorizontal: 12, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassBorder, shadowColor: C.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.14, shadowRadius: 8, elevation: 4 },
-  backText:      { fontSize: 13, fontWeight: '700', color: C.black },
-  navTitle:      { fontSize: 18, fontWeight: '800', color: C.black },
-  scroll:        { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 },
-  emptyState:    { alignItems: 'center', paddingVertical: 24, gap: 10 },
-  emptyEmoji:    { fontSize: 40 },
-  emptyTitle:    { fontSize: 17, fontWeight: '800', color: C.black },
-  emptySub:      { fontSize: 13, color: C.blackSoft, textAlign: 'center' },
-  cardHeader:    { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
-  avatar:        { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.6)', borderWidth: 1.5, borderColor: C.glassBorder, alignItems: 'center', justifyContent: 'center' },
-  avatarEmoji:   { fontSize: 24 },
-  userName:      { fontSize: 17, fontWeight: '800', color: C.black },
-  swapLine:      { fontSize: 13, color: C.blackSoft, marginTop: 2 },
-  deadlineBadge: { borderRadius: 8, paddingVertical: 4, paddingHorizontal: 8, borderWidth: 1 },
-  deadlineText:  { fontSize: 12, fontWeight: '800' },
-  scopeBox:      { backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 8, padding: 10, marginBottom: 12 },
-  scopeLabel:    { fontSize: 9, fontWeight: '800', color: C.blackSoft, letterSpacing: 1.2, marginBottom: 4 },
-  scopeText:     { fontSize: 13, color: C.blackMid, lineHeight: 19 },
+  safe:        { flex: 1, backgroundColor: C.bgDeep },
+  bgLayer:     { ...StyleSheet.absoluteFillObject, backgroundColor: C.bg },
+  nav:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10, zIndex: 2 },
+  backPill:    { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 20, paddingVertical: 7, paddingHorizontal: 12, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassBorder, shadowColor: C.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.14, shadowRadius: 8, elevation: 4 },
+  backText:    { fontSize: 13, fontWeight: '700', color: C.black },
+  navTitle:    { fontSize: 18, fontWeight: '800', color: C.black },
+  scroll:      { paddingHorizontal: 8, paddingTop: 4, paddingBottom: 40 },
+  emptyWrap:   { marginHorizontal: 8, marginTop: 8, paddingVertical: 14, overflow: 'visible' },
+  emptyGlowOne:{ position: 'absolute', left: 0, right: 0, top: 14, bottom: 14, borderRadius: 14, backgroundColor: C.glowOne, transform: [{ scale: 1.07 }] },
+  emptyGlowTwo:{ position: 'absolute', left: 0, right: 0, top: 14, bottom: 14, borderRadius: 14, backgroundColor: C.glowTwo, transform: [{ scale: 1.12 }] },
+  emptyCard:   { borderRadius: 12, padding: 16, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassBorder, shadowColor: C.shadow, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.20, shadowRadius: 14, elevation: 8, alignItems: 'center', paddingVertical: 24, gap: 10 },
+  emptyEmoji:  { fontSize: 40 },
+  emptyTitle:  { fontSize: 17, fontWeight: '800', color: C.black },
+  emptySub:    { fontSize: 13, color: C.blackSoft, textAlign: 'center' },
 });

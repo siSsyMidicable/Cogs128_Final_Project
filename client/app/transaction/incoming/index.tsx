@@ -1,9 +1,8 @@
 /**
  * /transaction/incoming
- * Pending swap requests waiting for YOU to accept or decline.
- * Seeded: Lina sent a request.
- * Each pending card has a pre-trade check-in panel so you can
- * message the requester before committing to a swap.
+ * – Pre-trade chat with read receipts + "Sent" status on your messages
+ * – Accepting a request calls confirmConnect, dismisses card, then
+ *   navigates back so the hub badge re-reads as 0.
  */
 import React, { useState } from 'react';
 import {
@@ -28,6 +27,7 @@ const C = {
   black: '#000', blackMid: 'rgba(0,0,0,0.78)', blackSoft: 'rgba(0,0,0,0.55)',
   teal: '#61d8cc', tealDark: '#2a8780',
   red: '#EF767A', gold: '#FFD166', shadow: '#000',
+  readGreen: '#437a22',
 };
 
 function Island({ children }: { children: React.ReactNode }) {
@@ -54,25 +54,52 @@ function BackIcon() {
   );
 }
 
-// ─── Pre-trade check-in panel (used on each incoming card) ───────────────────
-type PreMessage = { text: string; fromMe: boolean; time: string };
+// ─── Message status helpers ───────────────────────────────────────────────────
+// Each message can be: 'sending' → 'sent' → 'read'
+type MsgStatus = 'sent' | 'read';
+type PreMessage = { text: string; fromMe: boolean; time: string; status?: MsgStatus };
 
+function fmt(iso: string) {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+// ─── Pre-trade check-in panel ─────────────────────────────────────────────────
 function PreTradeChat({ partnerName }: { partnerName: string }) {
-  const [open, setOpen]     = useState(false);
-  const [msgs, setMsgs]     = useState<PreMessage[]>([
+  const [open, setOpen]   = useState(false);
+  const [msgs, setMsgs]   = useState<PreMessage[]>([
     {
-      text: `Hi! I'd love to swap — I can teach ${partnerName === 'Lina' ? 'Meal Prep & Nutrition' : 'my skills'}. What works for your schedule?`,
+      text: `Hi! I'd love to swap — I can teach ${
+        partnerName === 'Lina' ? 'Meal Prep & Nutrition' : 'my skills'
+      }. What works for your schedule?`,
       fromMe: false,
       time: new Date(Date.now() - 3_600_000).toISOString(),
+      // Their opening message is already "read" by you (you're viewing it)
+      status: 'read',
     },
   ]);
-  const [draft, setDraft]   = useState('');
-  const scrollRef           = React.useRef<ScrollView>(null);
+  const [draft, setDraft] = useState('');
+  const scrollRef         = React.useRef<ScrollView>(null);
 
   function send() {
     const trimmed = draft.trim();
     if (!trimmed) return;
-    setMsgs(prev => [...prev, { text: trimmed, fromMe: true, time: new Date().toISOString() }]);
+
+    const newMsg: PreMessage = {
+      text: trimmed,
+      fromMe: true,
+      time: new Date().toISOString(),
+      status: 'sent',
+    };
+
+    setMsgs(prev => {
+      // Mark the previous outgoing message (if any) as 'read' with a fake timestamp
+      const updated = prev.map((m, i) =>
+        m.fromMe && i === prev.length - 1 && m.status === 'sent'
+          ? { ...m, status: 'read' as MsgStatus }
+          : m
+      );
+      return [...updated, newMsg];
+    });
     setDraft('');
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
   }
@@ -104,16 +131,28 @@ function PreTradeChat({ partnerName }: { partnerName: string }) {
               showsVerticalScrollIndicator={false}
               onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
             >
-              {msgs.map((m, i) => (
-                <View key={i} style={[pt.bubble, m.fromMe ? pt.bubbleMe : pt.bubbleThem]}>
-                  <Text style={pt.bubbleMeta}>
-                    {m.fromMe ? 'You' : partnerName}
-                    {' · '}
-                    {new Date(m.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-                  </Text>
-                  <Text style={pt.bubbleText}>{m.text}</Text>
-                </View>
-              ))}
+              {msgs.map((m, i) => {
+                const isLast = i === msgs.length - 1;
+                return (
+                  <View key={i} style={[pt.bubble, m.fromMe ? pt.bubbleMe : pt.bubbleThem]}>
+                    <Text style={pt.bubbleMeta}>
+                      {m.fromMe ? 'You' : partnerName}{' · '}{fmt(m.time)}
+                    </Text>
+                    <Text style={pt.bubbleText}>{m.text}</Text>
+                    {/* Status badge — only on outgoing messages */}
+                    {m.fromMe && (
+                      <Text style={[
+                        pt.statusBadge,
+                        m.status === 'read' ? pt.statusRead : pt.statusSent,
+                      ]}>
+                        {m.status === 'read'
+                          ? `✓✓ Read · ${fmt(m.time)}`
+                          : '✓ Sent'}
+                      </Text>
+                    )}
+                  </View>
+                );
+              })}
             </ScrollView>
 
             <View style={pt.inputRow}>
@@ -173,6 +212,9 @@ const pt = StyleSheet.create({
   bubbleThem:  { backgroundColor: 'rgba(0,0,0,0.06)',     alignSelf: 'flex-start' },
   bubbleMeta:  { fontSize: 10, color: C.blackSoft, marginBottom: 3, fontWeight: '600' },
   bubbleText:  { fontSize: 13, color: C.blackMid, lineHeight: 18 },
+  statusBadge: { fontSize: 9, marginTop: 3, textAlign: 'right', fontWeight: '700' },
+  statusSent:  { color: C.blackSoft },
+  statusRead:  { color: C.readGreen },
   inputRow:    {
     flexDirection: 'row', alignItems: 'flex-end',
     paddingHorizontal: 10, paddingVertical: 8,
@@ -199,7 +241,6 @@ const pt = StyleSheet.create({
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export default function IncomingScreen() {
   const [dismissed, setDismissed] = useState<string[]>([]);
-
   const { requests } = getMatchingState();
   const pending = MOCK_USERS.filter(
     u => requests.has(u.id) && !dismissed.includes(u.id)
@@ -208,6 +249,8 @@ export default function IncomingScreen() {
   function handleAccept(userId: string) {
     confirmConnect(userId);
     setDismissed(d => [...d, userId]);
+    // Navigate back so TransactionHub re-renders with updated counts
+    router.back();
   }
   function handleDecline(userId: string) {
     declineRequest(userId);
@@ -238,9 +281,9 @@ export default function IncomingScreen() {
             </View>
           </Island>
         ) : pending.map(user => {
-          const score      = matchScore(YOU, user);
-          const theyOffer  = user.offers.filter(o => YOU.requests.includes(o));
-          const youOffer   = YOU.offers.filter(o => user.requests.includes(o));
+          const score     = matchScore(YOU, user);
+          const theyOffer = user.offers.filter(o => YOU.requests.includes(o));
+          const youOffer  = YOU.offers.filter(o => user.requests.includes(o));
           return (
             <Island key={user.id}>
               <View style={s.cardHeader}>
