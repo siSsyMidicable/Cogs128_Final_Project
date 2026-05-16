@@ -11,7 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { router } from 'expo-router';
 import { MOCK_USERS, ACTIVE_SWAPS } from '@/lib/matching/data';
-import { getState } from '@/lib/matching/matching';
+import { getMatchingState } from '@/lib/matching/matching';
 
 const C = {
   bg: '#7DE5E5', bgDeep: '#8FEBE5',
@@ -20,7 +20,6 @@ const C = {
   black: '#000', blackMid: 'rgba(0,0,0,0.78)', blackSoft: 'rgba(0,0,0,0.55)',
   teal: '#61d8cc', tealDark: '#2a8780',
   orange: '#FF8C42', gold: '#FFD166', shadow: '#000',
-  track: 'rgba(0,0,0,0.10)',
 };
 
 function Island({ children }: { children: React.ReactNode }) {
@@ -50,16 +49,17 @@ function BackIcon() {
 function daysLeft(isoDate: string) {
   const ms = new Date(isoDate).getTime() - Date.now();
   const d  = Math.ceil(ms / 86_400_000);
-  if (d < 0)  return { label: `${Math.abs(d)}d overdue`, color: '#EF767A' };
-  if (d === 0) return { label: 'Due today!',             color: C.orange };
-  return         { label: `${d}d left`,                  color: d <= 3 ? C.orange : C.teal };
+  if (d < 0)   return { label: `${Math.abs(d)}d overdue`, color: '#EF767A' };
+  if (d === 0) return { label: 'Due today!',              color: C.orange };
+  return         { label: `${d}d left`,                   color: d <= 3 ? C.orange : C.teal };
 }
 
 export default function OngoingScreen() {
   const [expanded, setExpanded] = useState<string | null>(null);
 
+  const { connections } = getMatchingState();
   const active = MOCK_USERS
-    .filter(u => getState(u.id) === 'connected')
+    .filter(u => connections.has(u.id))
     .map(u => ({
       user: u,
       meta: ACTIVE_SWAPS.find(m => m.userId === u.id),
@@ -70,7 +70,6 @@ export default function OngoingScreen() {
       <StatusBar barStyle="dark-content" />
       <View style={s.bgLayer} />
 
-      {/* Nav */}
       <View style={s.nav}>
         <Pressable onPress={() => router.back()} style={({ pressed }) => [s.backPill, pressed && { opacity: 0.75 }]} accessibilityLabel="Go back" accessibilityRole="button">
           <BackIcon />
@@ -81,7 +80,6 @@ export default function OngoingScreen() {
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-
         {active.length === 0 ? (
           <Island>
             <View style={s.emptyState}>
@@ -91,11 +89,10 @@ export default function OngoingScreen() {
             </View>
           </Island>
         ) : active.map(({ user, meta }) => {
-          const dl = meta ? daysLeft(meta.deadlineIso) : null;
+          const dl     = meta ? daysLeft(meta.deadlineIso) : null;
           const isOpen = expanded === user.id;
           return (
             <Island key={user.id}>
-              {/* Header */}
               <View style={s.cardHeader}>
                 <View style={s.avatar}>
                   <Text style={s.avatarEmoji}>{user.avatar}</Text>
@@ -111,7 +108,6 @@ export default function OngoingScreen() {
                 )}
               </View>
 
-              {/* Scope */}
               {meta && (
                 <View style={s.scopeBox}>
                   <Text style={s.scopeLabel}>AGREED SCOPE</Text>
@@ -119,7 +115,6 @@ export default function OngoingScreen() {
                 </View>
               )}
 
-              {/* Check-in toggle */}
               {meta && meta.checkIns.length > 0 && (
                 <Pressable
                   onPress={() => setExpanded(isOpen ? null : user.id)}
@@ -127,7 +122,9 @@ export default function OngoingScreen() {
                   accessibilityRole="button"
                 >
                   <Text style={s.checkInToggleText}>
-                    {isOpen ? '▲ Hide check-ins' : `▼ ${meta.checkIns.length} check-in${meta.checkIns.length > 1 ? 's' : ''}`}
+                    {isOpen
+                      ? '▲ Hide check-ins'
+                      : `▼ ${meta.checkIns.length} check-in${meta.checkIns.length > 1 ? 's' : ''}`}
                   </Text>
                 </Pressable>
               )}
@@ -136,7 +133,9 @@ export default function OngoingScreen() {
                 <View style={s.checkInLog}>
                   {meta.checkIns.map((ci, i) => (
                     <View key={i} style={[s.checkInRow, ci.fromMe ? s.checkInMe : s.checkInThem]}>
-                      <Text style={s.checkInDate}>{new Date(ci.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+                      <Text style={s.checkInDate}>
+                        {new Date(ci.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </Text>
                       <Text style={s.checkInNote}>{ci.note}</Text>
                     </View>
                   ))}
@@ -152,33 +151,33 @@ export default function OngoingScreen() {
 }
 
 const s = StyleSheet.create({
-  safe:          { flex: 1, backgroundColor: C.bgDeep },
-  bgLayer:       { ...StyleSheet.absoluteFillObject, backgroundColor: C.bg },
-  nav:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10, zIndex: 2 },
-  backPill:      { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 20, paddingVertical: 7, paddingHorizontal: 12, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassBorder, shadowColor: C.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.14, shadowRadius: 8, elevation: 4 },
-  backText:      { fontSize: 13, fontWeight: '700', color: C.black },
-  navTitle:      { fontSize: 18, fontWeight: '800', color: C.black },
-  scroll:        { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 },
-  emptyState:    { alignItems: 'center', paddingVertical: 24, gap: 10 },
-  emptyEmoji:    { fontSize: 40 },
-  emptyTitle:    { fontSize: 17, fontWeight: '800', color: C.black },
-  emptySub:      { fontSize: 13, color: C.blackSoft, textAlign: 'center' },
-  cardHeader:    { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
-  avatar:        { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.6)', borderWidth: 1.5, borderColor: C.glassBorder, alignItems: 'center', justifyContent: 'center' },
-  avatarEmoji:   { fontSize: 24 },
-  userName:      { fontSize: 17, fontWeight: '800', color: C.black },
-  swapLine:      { fontSize: 13, color: C.blackSoft, marginTop: 2 },
-  deadlineBadge: { borderRadius: 8, paddingVertical: 4, paddingHorizontal: 8, borderWidth: 1 },
-  deadlineText:  { fontSize: 12, fontWeight: '800' },
-  scopeBox:      { backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 8, padding: 10, marginBottom: 12 },
-  scopeLabel:    { fontSize: 9, fontWeight: '800', color: C.blackSoft, letterSpacing: 1.2, marginBottom: 4 },
-  scopeText:     { fontSize: 13, color: C.blackMid, lineHeight: 19 },
-  checkInToggle: { alignSelf: 'flex-start', borderRadius: 6, paddingVertical: 5, paddingHorizontal: 10, backgroundColor: 'rgba(97,216,204,0.2)', borderWidth: 1, borderColor: C.teal },
+  safe:              { flex: 1, backgroundColor: C.bgDeep },
+  bgLayer:           { ...StyleSheet.absoluteFillObject, backgroundColor: C.bg },
+  nav:               { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10, zIndex: 2 },
+  backPill:          { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 20, paddingVertical: 7, paddingHorizontal: 12, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassBorder, shadowColor: C.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.14, shadowRadius: 8, elevation: 4 },
+  backText:          { fontSize: 13, fontWeight: '700', color: C.black },
+  navTitle:          { fontSize: 18, fontWeight: '800', color: C.black },
+  scroll:            { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 },
+  emptyState:        { alignItems: 'center', paddingVertical: 24, gap: 10 },
+  emptyEmoji:        { fontSize: 40 },
+  emptyTitle:        { fontSize: 17, fontWeight: '800', color: C.black },
+  emptySub:          { fontSize: 13, color: C.blackSoft, textAlign: 'center' },
+  cardHeader:        { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+  avatar:            { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.6)', borderWidth: 1.5, borderColor: C.glassBorder, alignItems: 'center', justifyContent: 'center' },
+  avatarEmoji:       { fontSize: 24 },
+  userName:          { fontSize: 17, fontWeight: '800', color: C.black },
+  swapLine:          { fontSize: 13, color: C.blackSoft, marginTop: 2 },
+  deadlineBadge:     { borderRadius: 8, paddingVertical: 4, paddingHorizontal: 8, borderWidth: 1 },
+  deadlineText:      { fontSize: 12, fontWeight: '800' },
+  scopeBox:          { backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 8, padding: 10, marginBottom: 12 },
+  scopeLabel:        { fontSize: 9, fontWeight: '800', color: C.blackSoft, letterSpacing: 1.2, marginBottom: 4 },
+  scopeText:         { fontSize: 13, color: C.blackMid, lineHeight: 19 },
+  checkInToggle:     { alignSelf: 'flex-start', borderRadius: 6, paddingVertical: 5, paddingHorizontal: 10, backgroundColor: 'rgba(97,216,204,0.2)', borderWidth: 1, borderColor: C.teal },
   checkInToggleText: { fontSize: 12, fontWeight: '700', color: C.tealDark },
-  checkInLog:    { marginTop: 10, gap: 8 },
-  checkInRow:    { borderRadius: 8, padding: 10 },
-  checkInMe:     { backgroundColor: 'rgba(42,135,128,0.12)', alignSelf: 'flex-end', maxWidth: '88%' },
-  checkInThem:   { backgroundColor: 'rgba(0,0,0,0.06)', alignSelf: 'flex-start', maxWidth: '88%' },
-  checkInDate:   { fontSize: 10, color: C.blackSoft, marginBottom: 3, fontWeight: '700' },
-  checkInNote:   { fontSize: 13, color: C.blackMid, lineHeight: 18 },
+  checkInLog:        { marginTop: 10, gap: 8 },
+  checkInRow:        { borderRadius: 8, padding: 10 },
+  checkInMe:         { backgroundColor: 'rgba(42,135,128,0.12)', alignSelf: 'flex-end', maxWidth: '88%' },
+  checkInThem:       { backgroundColor: 'rgba(0,0,0,0.06)', alignSelf: 'flex-start', maxWidth: '88%' },
+  checkInDate:       { fontSize: 10, color: C.blackSoft, marginBottom: 3, fontWeight: '700' },
+  checkInNote:       { fontSize: 13, color: C.blackMid, lineHeight: 18 },
 });

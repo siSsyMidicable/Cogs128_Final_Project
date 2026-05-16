@@ -11,9 +11,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useUser } from '@/lib/auth/auth';
 import { MOCK_USERS } from '@/lib/matching/data';
-import { getState } from '@/lib/matching/matching';
+import { getMatchingState } from '@/lib/matching/matching';
 
-// ── Palette (identical to score-breakdown) ────────────────────────────────
 const C = {
   bg:          '#7DE5E5',
   bgDeep:      '#8FEBE5',
@@ -32,7 +31,6 @@ const C = {
   shadow:      '#000',
 };
 
-// ── Island ───────────────────────────────────────────────────────────────────
 function Island({ children, accent }: { children: React.ReactNode; accent?: string }) {
   return (
     <View style={isl.outer}>
@@ -51,7 +49,6 @@ const isl = StyleSheet.create({
   inner:   { borderRadius: 12, padding: 16, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassBorder, shadowColor: C.shadow, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.20, shadowRadius: 14, elevation: 8 },
 });
 
-// ── Tab tile ─────────────────────────────────────────────────────────────────
 function TabTile({
   emoji, label, sub, badge, accent, route,
 }: {
@@ -84,14 +81,14 @@ function TabTile({
   );
 }
 
-// ── Screen ───────────────────────────────────────────────────────────────────
 export default function TransactionHub() {
   const { user } = useUser();
 
-  // Count badges from matching state
-  const incomingCount = MOCK_USERS.filter(u => getState(u.id) === 'requested').length;
-  const ongoingCount  = MOCK_USERS.filter(u => getState(u.id) === 'connected').length;
-  const outgoingCount = MOCK_USERS.filter(u => getState(u.id) === 'completed').length;
+  const { requests, connections, completed } = getMatchingState();
+
+  const incomingCount = MOCK_USERS.filter(u => requests.has(u.id)).length;
+  const ongoingCount  = MOCK_USERS.filter(u => connections.has(u.id)).length;
+  const outgoingCount = MOCK_USERS.filter(u => completed.has(u.id)).length;
 
   return (
     <SafeAreaView style={s.safe}>
@@ -102,7 +99,6 @@ export default function TransactionHub() {
         contentContainerStyle={s.scroll}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero */}
         <View style={s.hero}>
           <Text style={s.title}>Skill Swap</Text>
           <Text style={s.subtitle}>
@@ -110,7 +106,6 @@ export default function TransactionHub() {
           </Text>
         </View>
 
-        {/* Tab tiles */}
         <TabTile
           emoji="📥"
           label="Incoming Requests"
@@ -136,7 +131,6 @@ export default function TransactionHub() {
           route="/transaction/outgoing"
         />
 
-        {/* Match CTA */}
         <Island>
           <Pressable
             onPress={() => router.push('/') }
@@ -155,19 +149,19 @@ export default function TransactionHub() {
 }
 
 const s = StyleSheet.create({
-  safe:       { flex: 1, backgroundColor: C.bgDeep },
-  bgLayer:    { ...StyleSheet.absoluteFillObject, backgroundColor: C.bg },
-  scroll:     { paddingHorizontal: 20, paddingTop: 48, paddingBottom: 40 },
-  hero:       { alignItems: 'center', marginBottom: 8 },
-  title:      { fontSize: 40, fontWeight: '800', color: C.black, marginBottom: 8 },
-  subtitle:   { fontSize: 18, color: 'rgba(0,0,0,0.8)', textAlign: 'center' },
-  tileRow:    { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  tileEmoji:  { fontSize: 28 },
-  tileLabel:  { fontSize: 17, fontWeight: '800', color: C.black, marginBottom: 2 },
-  tileSub:    { fontSize: 13, color: C.blackSoft },
-  badge:      { minWidth: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
-  badgeText:  { fontSize: 12, fontWeight: '900', color: C.black },
-  arrow:      { fontSize: 28, fontWeight: '900', lineHeight: 32 },
-  matchBtn:   { borderRadius: 8, paddingVertical: 14, backgroundColor: C.tealDark, alignItems: 'center' },
+  safe:         { flex: 1, backgroundColor: C.bgDeep },
+  bgLayer:      { ...StyleSheet.absoluteFillObject, backgroundColor: C.bg },
+  scroll:       { paddingHorizontal: 20, paddingTop: 48, paddingBottom: 40 },
+  hero:         { alignItems: 'center', marginBottom: 8 },
+  title:        { fontSize: 40, fontWeight: '800', color: C.black, marginBottom: 8 },
+  subtitle:     { fontSize: 18, color: 'rgba(0,0,0,0.8)', textAlign: 'center' },
+  tileRow:      { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  tileEmoji:    { fontSize: 28 },
+  tileLabel:    { fontSize: 17, fontWeight: '800', color: C.black, marginBottom: 2 },
+  tileSub:      { fontSize: 13, color: C.blackSoft },
+  badge:        { minWidth: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
+  badgeText:    { fontSize: 12, fontWeight: '900', color: C.black },
+  arrow:        { fontSize: 28, fontWeight: '900', lineHeight: 32 },
+  matchBtn:     { borderRadius: 8, paddingVertical: 14, backgroundColor: C.tealDark, alignItems: 'center' },
   matchBtnText: { fontSize: 16, fontWeight: '800', color: '#fff' },
 });

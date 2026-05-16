@@ -12,7 +12,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { router } from 'expo-router';
 import { MOCK_USERS, YOU } from '@/lib/matching/data';
-import { getState, acceptRequest, declineRequest, matchScore } from '@/lib/matching/matching';
+import {
+  getMatchingState,
+  confirmConnect,
+  declineRequest,
+  matchScore,
+} from '@/lib/matching/matching';
 
 const C = {
   bg: '#7DE5E5', bgDeep: '#8FEBE5',
@@ -50,12 +55,13 @@ function BackIcon() {
 export default function IncomingScreen() {
   const [dismissed, setDismissed] = useState<string[]>([]);
 
+  const { requests } = getMatchingState();
   const pending = MOCK_USERS.filter(
-    u => getState(u.id) === 'requested' && !dismissed.includes(u.id)
+    u => requests.has(u.id) && !dismissed.includes(u.id)
   );
 
   function handleAccept(userId: string) {
-    acceptRequest(userId);
+    confirmConnect(userId);
     setDismissed(d => [...d, userId]);
   }
   function handleDecline(userId: string) {
@@ -68,7 +74,6 @@ export default function IncomingScreen() {
       <StatusBar barStyle="dark-content" />
       <View style={s.bgLayer} />
 
-      {/* Nav */}
       <View style={s.nav}>
         <Pressable onPress={() => router.back()} style={({ pressed }) => [s.backPill, pressed && { opacity: 0.75 }]} accessibilityLabel="Go back" accessibilityRole="button">
           <BackIcon />
@@ -79,36 +84,41 @@ export default function IncomingScreen() {
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-
         {pending.length === 0 ? (
           <Island>
             <View style={s.emptyState}>
               <Text style={s.emptyEmoji}>📥</Text>
               <Text style={s.emptyTitle}>No pending requests</Text>
-              <Text style={s.emptySub}>When someone wants to swap with you, they’ll appear here.</Text>
+              <Text style={s.emptySub}>When someone wants to swap with you, they'll appear here.</Text>
             </View>
           </Island>
         ) : pending.map(user => {
-          const score = matchScore(YOU, user);
-          const theyOffer = user.offers.filter(o => YOU.requests.includes(o));
-          const youOffer  = YOU.offers.filter(o => user.requests.includes(o));
+          const score      = matchScore(YOU, user);
+          const theyOffer  = user.offers.filter(o => YOU.requests.includes(o));
+          const youOffer   = YOU.offers.filter(o => user.requests.includes(o));
           return (
             <Island key={user.id}>
-              {/* Header */}
               <View style={s.cardHeader}>
                 <View style={s.avatar}>
                   <Text style={s.avatarEmoji}>{user.avatar}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.userName}>{user.name}</Text>
-                  <Text style={s.scoreText}>Match score: <Text style={{ color: C.teal, fontWeight: '900' }}>{Math.round(score.total * 100)}%</Text></Text>
+                  <Text style={s.scoreText}>
+                    Match score:{' '}
+                    <Text style={{ color: C.teal, fontWeight: '900' }}>
+                      {Math.round(score.total * 100)}%
+                    </Text>
+                  </Text>
                 </View>
-                <Pressable onPress={() => router.push(`/transaction/score-breakdown?userId=${user.id}` as any)} style={s.scoreBtn}>
+                <Pressable
+                  onPress={() => router.push(`/transaction/score-breakdown?userId=${user.id}` as any)}
+                  style={s.scoreBtn}
+                >
                   <Text style={s.scoreBtnText}>Details</Text>
                 </Pressable>
               </View>
 
-              {/* Offer summary */}
               <View style={s.swapRow}>
                 <View style={s.swapCol}>
                   <Text style={s.swapLabel}>They offer you</Text>
@@ -125,12 +135,21 @@ export default function IncomingScreen() {
                 </View>
               </View>
 
-              {/* Actions */}
               <View style={s.actionRow}>
-                <Pressable onPress={() => handleDecline(user.id)} style={({ pressed }) => [s.declineBtn, pressed && { opacity: 0.8 }]} accessibilityRole="button" accessibilityLabel={`Decline ${user.name}`}>
+                <Pressable
+                  onPress={() => handleDecline(user.id)}
+                  style={({ pressed }) => [s.declineBtn, pressed && { opacity: 0.8 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Decline ${user.name}`}
+                >
                   <Text style={s.declineBtnText}>Decline</Text>
                 </Pressable>
-                <Pressable onPress={() => handleAccept(user.id)} style={({ pressed }) => [s.acceptBtn, pressed && { opacity: 0.8 }]} accessibilityRole="button" accessibilityLabel={`Accept ${user.name}`}>
+                <Pressable
+                  onPress={() => handleAccept(user.id)}
+                  style={({ pressed }) => [s.acceptBtn, pressed && { opacity: 0.8 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Accept ${user.name}`}
+                >
                   <Text style={s.acceptBtnText}>Accept ›</Text>
                 </Pressable>
               </View>
@@ -144,33 +163,33 @@ export default function IncomingScreen() {
 }
 
 const s = StyleSheet.create({
-  safe:         { flex: 1, backgroundColor: C.bgDeep },
-  bgLayer:      { ...StyleSheet.absoluteFillObject, backgroundColor: C.bg },
-  nav:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10, zIndex: 2 },
-  backPill:     { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 20, paddingVertical: 7, paddingHorizontal: 12, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassBorder, shadowColor: C.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.14, shadowRadius: 8, elevation: 4 },
-  backText:     { fontSize: 13, fontWeight: '700', color: C.black },
-  navTitle:     { fontSize: 18, fontWeight: '800', color: C.black },
-  scroll:       { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 },
-  emptyState:   { alignItems: 'center', paddingVertical: 24, gap: 10 },
-  emptyEmoji:   { fontSize: 40 },
-  emptyTitle:   { fontSize: 17, fontWeight: '800', color: C.black },
-  emptySub:     { fontSize: 13, color: C.blackSoft, textAlign: 'center', maxWidth: 260 },
-  cardHeader:   { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
-  avatar:       { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.6)', borderWidth: 1.5, borderColor: C.glassBorder, alignItems: 'center', justifyContent: 'center' },
-  avatarEmoji:  { fontSize: 24 },
-  userName:     { fontSize: 18, fontWeight: '800', color: C.black },
-  scoreText:    { fontSize: 13, color: C.blackSoft, marginTop: 2 },
-  scoreBtn:     { borderRadius: 8, paddingVertical: 6, paddingHorizontal: 12, backgroundColor: 'rgba(97,216,204,0.25)', borderWidth: 1, borderColor: C.teal },
-  scoreBtnText: { fontSize: 12, fontWeight: '700', color: C.tealDark },
-  swapRow:      { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 16 },
-  swapCol:      { flex: 1, gap: 4 },
-  swapLabel:    { fontSize: 11, fontWeight: '800', color: C.blackSoft, letterSpacing: 0.6, marginBottom: 4 },
-  skill:        { fontSize: 13, fontWeight: '600', color: C.tealDark },
-  skillMuted:   { fontSize: 12, color: C.blackSoft, fontStyle: 'italic' },
-  swapArrow:    { fontSize: 22, color: C.blackSoft, marginTop: 20 },
-  actionRow:    { flexDirection: 'row', gap: 10 },
-  declineBtn:   { flex: 1, borderRadius: 8, paddingVertical: 12, alignItems: 'center', backgroundColor: 'rgba(239,118,122,0.18)', borderWidth: 1, borderColor: 'rgba(239,118,122,0.5)' },
+  safe:           { flex: 1, backgroundColor: C.bgDeep },
+  bgLayer:        { ...StyleSheet.absoluteFillObject, backgroundColor: C.bg },
+  nav:            { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10, zIndex: 2 },
+  backPill:       { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 20, paddingVertical: 7, paddingHorizontal: 12, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassBorder, shadowColor: C.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.14, shadowRadius: 8, elevation: 4 },
+  backText:       { fontSize: 13, fontWeight: '700', color: C.black },
+  navTitle:       { fontSize: 18, fontWeight: '800', color: C.black },
+  scroll:         { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 },
+  emptyState:     { alignItems: 'center', paddingVertical: 24, gap: 10 },
+  emptyEmoji:     { fontSize: 40 },
+  emptyTitle:     { fontSize: 17, fontWeight: '800', color: C.black },
+  emptySub:       { fontSize: 13, color: C.blackSoft, textAlign: 'center', maxWidth: 260 },
+  cardHeader:     { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
+  avatar:         { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.6)', borderWidth: 1.5, borderColor: C.glassBorder, alignItems: 'center', justifyContent: 'center' },
+  avatarEmoji:    { fontSize: 24 },
+  userName:       { fontSize: 18, fontWeight: '800', color: C.black },
+  scoreText:      { fontSize: 13, color: C.blackSoft, marginTop: 2 },
+  scoreBtn:       { borderRadius: 8, paddingVertical: 6, paddingHorizontal: 12, backgroundColor: 'rgba(97,216,204,0.25)', borderWidth: 1, borderColor: C.teal },
+  scoreBtnText:   { fontSize: 12, fontWeight: '700', color: C.tealDark },
+  swapRow:        { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 16 },
+  swapCol:        { flex: 1, gap: 4 },
+  swapLabel:      { fontSize: 11, fontWeight: '800', color: C.blackSoft, letterSpacing: 0.6, marginBottom: 4 },
+  skill:          { fontSize: 13, fontWeight: '600', color: C.tealDark },
+  skillMuted:     { fontSize: 12, color: C.blackSoft, fontStyle: 'italic' },
+  swapArrow:      { fontSize: 22, color: C.blackSoft, marginTop: 20 },
+  actionRow:      { flexDirection: 'row', gap: 10 },
+  declineBtn:     { flex: 1, borderRadius: 8, paddingVertical: 12, alignItems: 'center', backgroundColor: 'rgba(239,118,122,0.18)', borderWidth: 1, borderColor: 'rgba(239,118,122,0.5)' },
   declineBtnText: { fontSize: 14, fontWeight: '700', color: C.red },
-  acceptBtn:    { flex: 1, borderRadius: 8, paddingVertical: 12, alignItems: 'center', backgroundColor: C.tealDark, shadowColor: C.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 8, elevation: 4 },
-  acceptBtnText: { fontSize: 14, fontWeight: '800', color: '#fff' },
+  acceptBtn:      { flex: 1, borderRadius: 8, paddingVertical: 12, alignItems: 'center', backgroundColor: C.tealDark, shadowColor: C.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 8, elevation: 4 },
+  acceptBtnText:  { fontSize: 14, fontWeight: '800', color: '#fff' },
 });
