@@ -44,7 +44,6 @@ const CARDS = [
 ];
 
 // ─── Step card ────────────────────────────────────────────────────────────────
-// isActive controls whether the step badge is highlighted or dimmed.
 function StepCard({
   step,
   title,
@@ -66,7 +65,6 @@ function StepCard({
         <View style={[styles.cardGlow, styles.cardGlowOne]} />
         <View style={[styles.cardGlow, styles.cardGlowTwo]} />
         <View style={[styles.infoCard, { transform: [{ rotate: tilt }] }]}>
-          {/* Badge: full colour when active, faded when not */}
           <View
             style={[
               stepCardStyles.badge,
@@ -129,7 +127,6 @@ function StepCarousel() {
   return (
     <View style={styles.carouselSection}>
       <View style={arrowStyles.row}>
-        {/* Prev arrow */}
         <Pressable
           onPress={() => goTo(activeIndex - 1)}
           style={({ pressed }) => [
@@ -144,7 +141,6 @@ function StepCarousel() {
           <Text style={[arrowStyles.arrowText, activeIndex === 0 && arrowStyles.arrowTextDisabled]}>‹</Text>
         </Pressable>
 
-        {/* Cards */}
         <View style={{ flex: 1 }}>
           <FlatList
             ref={flatListRef}
@@ -172,7 +168,6 @@ function StepCarousel() {
           />
         </View>
 
-        {/* Next arrow */}
         <Pressable
           onPress={() => goTo(activeIndex + 1)}
           style={({ pressed }) => [
@@ -211,7 +206,7 @@ export default function IntroScreen() {
             <Text style={styles.subtitle}>Trade your skills, grow together</Text>
           </View>
 
-          {/* Carousel — 3 step cards with prev/next arrows */}
+          {/* Carousel */}
           <StepCarousel />
 
           {/* CTA Button */}
@@ -221,13 +216,13 @@ export default function IntroScreen() {
               styles.skipButtonContainer,
               pressed && styles.skipButtonPressed,
             ]}
-            accessibilityLabel="Get started — go to sign in"
+            accessibilityLabel="Skip introduction — go to sign in"
           >
             <View style={[styles.skipGlow, styles.skipGlowA]} />
             <View style={[styles.skipGlow, styles.skipGlowB]} />
             <View style={[styles.skipGlow, styles.skipGlowC]} />
             <View style={styles.skipButton}>
-              <Text style={styles.skipLabel}>Get Started</Text>
+              <Text style={styles.skipLabel}>Skip Introduction</Text>
               <Text style={styles.skipArrow}>›</Text>
             </View>
           </Pressable>
@@ -271,21 +266,15 @@ const arrowStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  arrowBtnDisabled: {
-    opacity: 0.25,
-  },
-  arrowBtnPressed: {
-    opacity: 0.6,
-  },
+  arrowBtnDisabled: { opacity: 0.25 },
+  arrowBtnPressed: { opacity: 0.6 },
   arrowText: {
     fontSize: 30,
     fontWeight: "900",
     color: "#01696F",
     lineHeight: 34,
   },
-  arrowTextDisabled: {
-    color: "rgba(0,0,0,0.3)",
-  },
+  arrowTextDisabled: { color: "rgba(0,0,0,0.3)" },
 });
 
 // ─── Main Styles ──────────────────────────────────────────────────────────────
@@ -355,9 +344,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   cardWrapper: {},
-  cardPerspective: {
-    position: "relative",
-  },
+  cardPerspective: { position: "relative" },
   cardGlow: {
     position: "absolute",
     left: 0,
@@ -405,9 +392,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  dot: {
-    borderRadius: 99,
-  },
+  dot: { borderRadius: 99 },
   dotActive: {
     width: 22,
     height: 8,
@@ -420,12 +405,10 @@ const styles = StyleSheet.create({
   },
   skipButtonContainer: {
     width: "100%",
-    maxWidth: 240,
+    maxWidth: 260,
     position: "relative",
   },
-  skipButtonPressed: {
-    opacity: 0.88,
-  },
+  skipButtonPressed: { opacity: 0.88 },
   skipGlow: {
     position: "absolute",
     left: 8,
