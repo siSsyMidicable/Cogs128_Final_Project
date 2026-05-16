@@ -131,14 +131,15 @@ export default function TransactionHub() {
           route="/transaction/outgoing"
         />
 
+        {/* ── Find New Matches now goes to the browse/matching screen ── */}
         <Island>
           <Pressable
-            onPress={() => router.push('/') }
+            onPress={() => router.push('/matching')}
             style={({ pressed }) => [s.matchBtn, pressed && { opacity: 0.85 }]}
             accessibilityRole="button"
-            accessibilityLabel="Find new matches"
+            accessibilityLabel="Find skills to trade"
           >
-            <Text style={s.matchBtnText}>🤝  Find New Matches</Text>
+            <Text style={s.matchBtnText}>🔍  Find Skills to Trade</Text>
           </Pressable>
         </Island>
 
