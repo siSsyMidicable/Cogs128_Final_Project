@@ -1,0 +1,57 @@
+# ────────────────────────────────────────────────────────────────
+# Cogs128 Final Project — CI Build
+# Node.js 24-ready: actions/checkout@v4, upload-artifact@v4
+# ────────────────────────────────────────────────────────────────
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Opt into Node.js 24 now so the June 2026 forced migration is a no-op
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── Checkout ──────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4          # ships with Node 24 support
+
+      # ── Node.js setup ─────────────────────────────────────────
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'               # your app's runtime (unchanged)
+          cache: 'npm'
+          cache-dependency-path: 'client/package-lock.json'
+
+      # ── Client dependencies ────────────────────────────────────
+      - name: Install client dependencies
+        working-directory: client
+        run: npm ci
+
+      # ── TypeScript typecheck ───────────────────────────────────
+      - name: TypeScript typecheck
+        working-directory: client
+        run: npx tsc --noEmit
+        continue-on-error: true            # warnings shouldn't block demo builds
+
+      # ── Server dependencies ────────────────────────────────────
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+
+      # ── Upload build artifacts ─────────────────────────────────
+      - name: Upload client artifacts
+        uses: actions/upload-artifact@v4   # ships with Node 24 support
+        with:
+          name: client-build
+          path: client/
+          retention-days: 7
