@@ -38,7 +38,7 @@ const BASE_CARDS = [
   },
   {
     id: '3', step: '3', title: 'Request a Swap',
-    description: 'Send a swap request, connect, and exchange skills. After you're done, rate each other to build community trust.',
+    description: "Send a swap request, connect, and exchange skills. After you're done, rate each other to build community trust.",
     tilt: '-0.8deg', color: '#437A22',
   },
 ];
