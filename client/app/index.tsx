@@ -13,15 +13,22 @@ import {
 } from "react-native";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const CARD_WIDTH = Math.min(SCREEN_WIDTH - 56, 340);
-const CARD_SIDE_PADDING = (SCREEN_WIDTH - CARD_WIDTH) / 2;
+// Card is narrower than screen so neighbours peek at edges
+const CARD_WIDTH   = Math.min(SCREEN_WIDTH - 80, 300);
+// Extra horizontal padding so glow halos are never wall-clipped
+const H_PAD        = 10;
+const CARD_GAP     = 20;
+const CARD_STEP    = CARD_WIDTH + CARD_GAP;
+// Padding that centres the active card and lets neighbours peek
+const SIDE_PADDING = (SCREEN_WIDTH - CARD_WIDTH) / 2 - H_PAD;
 
 const CARDS = [
   {
     id: "1",
     step: "1",
     title: "List a Skill",
-    description: "Share what you can teach — coding, cooking, design, anything. Your skill is your currency.",
+    description:
+      "Share what you can teach — coding, cooking, design, anything. Your skill is your currency.",
     tilt: "-1deg",
     color: "#01696F",
   },
@@ -29,7 +36,8 @@ const CARDS = [
     id: "2",
     step: "2",
     title: "Browse Skills",
-    description: "Find someone who offers what you need. Filter by category, check their trust score, and see your match percentage.",
+    description:
+      "Find someone who offers what you need. Filter by category, check their trust score, and see your match percentage.",
     tilt: "1deg",
     color: "#01696F",
   },
@@ -37,7 +45,8 @@ const CARDS = [
     id: "3",
     step: "3",
     title: "Request a Swap",
-    description: "Send a swap request, connect, and exchange skills. After you're done, rate each other to build community trust.",
+    description:
+      "Send a swap request, connect, and exchange skills. After you're done, rate each other to build community trust.",
     tilt: "-0.8deg",
     color: "#437A22",
   },
@@ -60,11 +69,20 @@ function StepCard({
   isActive: boolean;
 }) {
   return (
-    <View style={[styles.cardWrapper, { width: CARD_WIDTH }]}>
+    // paddingVertical + paddingHorizontal give each card its own
+    // breathing room so the shadow/glow halo is never clipped by
+    // a neighbour or the FlatList bounding box — each card is an island.
+    <View style={[styles.cardWrapper, { width: CARD_WIDTH + H_PAD * 2 }]}>
       <View style={styles.cardPerspective}>
         <View style={[styles.cardGlow, styles.cardGlowOne]} />
         <View style={[styles.cardGlow, styles.cardGlowTwo]} />
-        <View style={[styles.infoCard, { transform: [{ rotate: tilt }] }]}>
+        <View
+          style={[
+            styles.infoCard,
+            { transform: [{ rotate: tilt }] },
+            !isActive && styles.infoCardDim,
+          ]}
+        >
           <View
             style={[
               stepCardStyles.badge,
@@ -89,20 +107,29 @@ function StepCard({
 }
 
 // ─── Dot indicators ───────────────────────────────────────────────────────────
-function DotIndicators({ count, activeIndex }: { count: number; activeIndex: number }) {
+function DotIndicators({
+  count,
+  activeIndex,
+}: {
+  count: number;
+  activeIndex: number;
+}) {
   return (
     <View style={styles.dotsRow}>
       {Array.from({ length: count }).map((_, i) => (
         <View
           key={i}
-          style={[styles.dot, i === activeIndex ? styles.dotActive : styles.dotInactive]}
+          style={[
+            styles.dot,
+            i === activeIndex ? styles.dotActive : styles.dotInactive,
+          ]}
         />
       ))}
     </View>
   );
 }
 
-// ─── Carousel ───────────────────────────────────────────────────────────────────
+// ─── Carousel ─────────────────────────────────────────────────────────────────
 function StepCarousel() {
   const [activeIndex, setActiveIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
@@ -116,7 +143,9 @@ function StepCarousel() {
     []
   );
 
-  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 60,
+  }).current;
 
   const goTo = (index: number) => {
     const clamped = Math.max(0, Math.min(CARDS.length - 1, index));
@@ -125,8 +154,11 @@ function StepCarousel() {
   };
 
   return (
+    // overflow:visible on every ancestor so card halos are never
+    // wall-clipped — the carousel lives in open air, not a clipping rect.
     <View style={styles.carouselSection}>
-      <View style={arrowStyles.row}>
+      <View style={styles.arrowRow}>
+        {/* Left arrow */}
         <Pressable
           onPress={() => goTo(activeIndex - 1)}
           style={({ pressed }) => [
@@ -138,21 +170,35 @@ function StepCarousel() {
           accessibilityLabel="Previous step"
           accessibilityRole="button"
         >
-          <Text style={[arrowStyles.arrowText, activeIndex === 0 && arrowStyles.arrowTextDisabled]}>‹</Text>
+          <Text
+            style={[
+              arrowStyles.arrowText,
+              activeIndex === 0 && arrowStyles.arrowTextDisabled,
+            ]}
+          >
+            ‹
+          </Text>
         </Pressable>
 
-        <View style={{ flex: 1 }}>
+        {/* FlatList in overflow:visible wrapper */}
+        <View style={styles.carouselScrollView}>
           <FlatList
             ref={flatListRef}
             data={CARDS}
             keyExtractor={(item) => item.id}
             horizontal
             pagingEnabled={false}
-            snapToInterval={CARD_WIDTH + 16}
+            snapToInterval={CARD_STEP + H_PAD * 2}
             snapToAlignment="center"
             decelerationRate="fast"
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: CARD_SIDE_PADDING, gap: 16 }}
+            // paddingVertical: gives top/bottom air so shadow+glow never
+            // touches the FlatList edge — visual separation is total.
+            contentContainerStyle={{
+              paddingHorizontal: SIDE_PADDING,
+              paddingVertical: 18,
+              gap: 0, // gap handled by cardWrapper paddingHorizontal
+            }}
             renderItem={({ item, index }) => (
               <StepCard
                 step={item.step}
@@ -168,6 +214,7 @@ function StepCarousel() {
           />
         </View>
 
+        {/* Right arrow */}
         <Pressable
           onPress={() => goTo(activeIndex + 1)}
           style={({ pressed }) => [
@@ -179,7 +226,14 @@ function StepCarousel() {
           accessibilityLabel="Next step"
           accessibilityRole="button"
         >
-          <Text style={[arrowStyles.arrowText, activeIndex === CARDS.length - 1 && arrowStyles.arrowTextDisabled]}>›</Text>
+          <Text
+            style={[
+              arrowStyles.arrowText,
+              activeIndex === CARDS.length - 1 && arrowStyles.arrowTextDisabled,
+            ]}
+          >
+            ›
+          </Text>
         </Pressable>
       </View>
 
@@ -209,7 +263,7 @@ export default function IntroScreen() {
           {/* Carousel */}
           <StepCarousel />
 
-          {/* CTA Button */}
+          {/* CTA */}
           <Pressable
             onPress={() => router.replace("/auth/login")}
             style={({ pressed }) => [
@@ -267,7 +321,7 @@ const arrowStyles = StyleSheet.create({
     justifyContent: "center",
   },
   arrowBtnDisabled: { opacity: 0.25 },
-  arrowBtnPressed: { opacity: 0.6 },
+  arrowBtnPressed:  { opacity: 0.6 },
   arrowText: {
     fontSize: 30,
     fontWeight: "900",
@@ -277,7 +331,7 @@ const arrowStyles = StyleSheet.create({
   arrowTextDisabled: { color: "rgba(0,0,0,0.3)" },
 });
 
-// ─── Main Styles ──────────────────────────────────────────────────────────────
+// ─── Main styles ──────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -305,6 +359,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 28,
   },
+
+  // ─ Hero ─
   hero: {
     width: "100%",
     alignItems: "center",
@@ -338,13 +394,41 @@ const styles = StyleSheet.create({
     color: "rgba(0,0,0,0.8)",
     textAlign: "center",
   },
+
+  // ─ Carousel ─
+  // overflow:visible so card halos can extend freely outside the container
+  // bounds — no hard line at top or bottom.
   carouselSection: {
     width: "100%",
     alignItems: "center",
     marginBottom: 24,
+    overflow: "visible",
   },
-  cardWrapper: {},
-  cardPerspective: { position: "relative" },
+  arrowRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: "100%",
+    overflow: "visible",
+  },
+  // overflow:visible propagated here too — this is the direct FlatList parent.
+  carouselScrollView: {
+    flex: 1,
+    overflow: "visible",
+  },
+
+  // ─ Card ─
+  // paddingVertical:18 + paddingHorizontal:H_PAD = the card's personal
+  // "force field" — shadow + glow halo live inside this padding so they
+  // are always fully visible and never touch a neighbour or the FlatList edge.
+  cardWrapper: {
+    paddingVertical: 18,
+    paddingHorizontal: H_PAD,
+    overflow: "visible",
+  },
+  cardPerspective: {
+    position: "relative",
+    marginVertical: 2,
+  },
   cardGlow: {
     position: "absolute",
     left: 0,
@@ -367,12 +451,17 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.20,
     shadowRadius: 12,
     elevation: 6,
     backgroundColor: "rgba(255,255,255,0.55)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.45)",
+  },
+  // Inactive cards recede slightly — reinforces the active card as the island
+  infoCardDim: {
+    opacity: 0.65,
+    transform: [{ scale: 0.97 }],
   },
   cardTitle: {
     fontSize: 18,
@@ -385,6 +474,8 @@ const styles = StyleSheet.create({
     color: "rgba(0,0,0,0.78)",
     lineHeight: 20,
   },
+
+  // ─ Dots ─
   dotsRow: {
     flexDirection: "row",
     gap: 8,
@@ -403,6 +494,8 @@ const styles = StyleSheet.create({
     height: 8,
     backgroundColor: "rgba(0,0,0,0.25)",
   },
+
+  // ─ CTA ─
   skipButtonContainer: {
     width: "100%",
     maxWidth: 260,
@@ -418,8 +511,14 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   skipGlowA: { backgroundColor: "rgba(255,107,26,0.45)" },
-  skipGlowB: { backgroundColor: "rgba(255,140,66,0.45)", transform: [{ scale: 1.03 }] },
-  skipGlowC: { backgroundColor: "rgba(255,163,102,0.35)", transform: [{ scale: 1.06 }] },
+  skipGlowB: {
+    backgroundColor: "rgba(255,140,66,0.45)",
+    transform: [{ scale: 1.03 }],
+  },
+  skipGlowC: {
+    backgroundColor: "rgba(255,163,102,0.35)",
+    transform: [{ scale: 1.06 }],
+  },
   skipButton: {
     borderRadius: 8,
     paddingVertical: 14,
