@@ -1,6 +1,6 @@
 # ────────────────────────────────────────────────────────────────
 # Cogs128 Final Project — CI Build
-# Node.js 24-ready: actions/checkout@v4, upload-artifact@v4
+# Node.js 24-ready • does NOT interfere with Pages deployment
 # ────────────────────────────────────────────────────────────────
 name: Build
 
@@ -9,6 +9,14 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+
+# Each workflow gets its own concurrency group scoped by workflow file
+# + branch. Only runs from THIS workflow cancel each other on rapid
+# pushes. The Pages deployment workflow runs in a separate group and
+# is never touched by this one.
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 # Opt into Node.js 24 now so the June 2026 forced migration is a no-op
 env:
@@ -22,13 +30,13 @@ jobs:
     steps:
       # ── Checkout ──────────────────────────────────────────────
       - name: Checkout repository
-        uses: actions/checkout@v4          # ships with Node 24 support
+        uses: actions/checkout@v4
 
       # ── Node.js setup ─────────────────────────────────────────
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'               # your app's runtime (unchanged)
+          node-version: '20'
           cache: 'npm'
           cache-dependency-path: 'client/package-lock.json'
 
@@ -41,7 +49,7 @@ jobs:
       - name: TypeScript typecheck
         working-directory: client
         run: npx tsc --noEmit
-        continue-on-error: true            # warnings shouldn't block demo builds
+        continue-on-error: true
 
       # ── Server dependencies ────────────────────────────────────
       - name: Install server dependencies
@@ -50,7 +58,7 @@ jobs:
 
       # ── Upload build artifacts ─────────────────────────────────
       - name: Upload client artifacts
-        uses: actions/upload-artifact@v4   # ships with Node 24 support
+        uses: actions/upload-artifact@v4
         with:
           name: client-build
           path: client/
