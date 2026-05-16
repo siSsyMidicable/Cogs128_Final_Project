@@ -156,7 +156,7 @@ export const LoginForm = () => {
                 )}
               </View>
 
-              {/* Login button — same shape/glow as Get Started, keeps teal color */}
+              {/* Login button */}
               <View style={styles.btnContainer}>
                 <View style={[styles.btnGlow, styles.btnGlowA]} />
                 <View style={[styles.btnGlow, styles.btnGlowB]} />
@@ -180,22 +180,6 @@ export const LoginForm = () => {
                   )}
                 </Pressable>
               </View>
-
-              {/* Register link */}
-              <Pressable
-                onPress={() => router.replace("/auth/register")}
-                style={({ pressed }) => [
-                  styles.linkBtn,
-                  pressed && styles.linkBtnPressed,
-                ]}
-                accessibilityLabel="Go to register screen"
-                accessibilityRole="link"
-              >
-                <Text style={styles.linkText}>
-                  Don't have an account?{" "}
-                  <Text style={styles.linkTextBold}>Register</Text>
-                </Text>
-              </Pressable>
             </View>
           </View>
         </ScrollView>
@@ -214,7 +198,6 @@ const styles = StyleSheet.create({
     position: "relative",
     overflow: "hidden",
   },
-  // Exact same background as intro
   gradientBackground: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "#7DE5E5",
@@ -252,7 +235,6 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     gap: 28,
   },
-  // Identical to intro hero block
   hero: {
     width: "100%",
     alignItems: "center",
@@ -268,7 +250,6 @@ const styles = StyleSheet.create({
     color: "rgba(0,0,0,0.8)",
     textAlign: "center",
   },
-  // Glass card — mirrors carousel card exactly
   glassCard: {
     width: "100%",
     position: "relative",
@@ -315,7 +296,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 4,
   },
-  // Inputs — glass style matching card
   fieldGroup: {
     gap: 6,
   },
@@ -362,7 +342,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     paddingLeft: 2,
   },
-  // Login button — same shape/glow as Get Started, keeps teal color
   btnContainer: {
     width: "100%",
     position: "relative",
@@ -412,21 +391,6 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     fontWeight: "900",
     color: "#fff",
-  },
-  // Register link
-  linkBtn: {
-    alignItems: "center",
-    paddingVertical: 6,
-  },
-  linkBtnPressed: { opacity: 0.7 },
-  linkText: {
-    fontSize: 14,
-    color: "rgba(0,0,0,0.65)",
-    fontWeight: "500",
-  },
-  linkTextBold: {
-    fontWeight: "800",
-    color: "#1d4b47",
   },
 });
 
