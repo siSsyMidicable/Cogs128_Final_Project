@@ -9,17 +9,18 @@ export const loginInputSchema = z.object({
 });
 
 export const registerInputSchema = z.object({
-  name: z.string().min(1),
+  name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email(),
-  password: z.string().min(1),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  confirmPassword: z.string(),
+}).refine((d) => d.password === d.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
 });
 
-type LoginValues = {
-  email: string;
-  password: string;
-};
+type LoginValues  = { email: string; password: string };
+type RegisterValues = { name: string; email: string; password: string; confirmPassword: string };
 
-// MatchUser superset — auth user always has offers/requests so matching never crashes
 export type User = MatchUser;
 
 let currentUser: User | null = null;
@@ -30,35 +31,110 @@ function publishUser(user: User | null) {
   userListeners.forEach((listener) => listener(user));
 }
 
+// ── Resolve API base from tunnel env or local fallback ───────────────────────
+const API_BASE: string = (() => {
+  try {
+    // Works in Expo via babel-plugin-transform-inline-env
+    const tunnel = (process.env as Record<string,string | undefined>).EXPO_PUBLIC_TUNNEL_URL ||
+                   (process.env as Record<string,string | undefined>).TUNNEL_URL;
+    if (tunnel) return tunnel.replace(/\/$/, '');
+  } catch { /* ignore */ }
+  return 'http://localhost:3000';
+})();
+
+// ── useLogin ─────────────────────────────────────────────────────────────────
 export function useLogin() {
   const [isPending, setIsPending] = useState(false);
 
   const mutate = useCallback(async (values: LoginValues) => {
     setIsPending(true);
+    try {
+      loginInputSchema.parse(values);
 
-    loginInputSchema.parse(values);
-
-    await new Promise((r) => setTimeout(r, 300));
-
-    // Spread YOU's matching fields so offers/requests/etc. are always defined
-    publishUser({
-      ...YOU,
-      id: values.email,
-      name: values.email.split('@')[0] || 'User',
-      email: values.email,
-    });
-
-    setIsPending(false);
-    return { ok: true };
+      // Try real Neon API first
+      try {
+        const res = await fetch(`${API_BASE}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: values.email, password: values.password }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error((body as { message?: string }).message || `Login failed (${res.status})`);
+        }
+        const data = await res.json() as { user?: { id: string; name: string; email: string } };
+        publishUser({
+          ...YOU,
+          id:    data.user?.id    ?? values.email,
+          name:  data.user?.name  ?? values.email.split('@')[0] ?? 'User',
+          email: data.user?.email ?? values.email,
+        });
+        return { ok: true };
+      } catch (networkErr) {
+        // If the server is unreachable (offline dev), fall back to local mock
+        if (networkErr instanceof TypeError) {
+          // TypeError = "Failed to fetch" = no network — safe to mock
+          await new Promise((r) => setTimeout(r, 300));
+          publishUser({
+            ...YOU,
+            id: values.email,
+            name: values.email.split('@')[0] || 'User',
+            email: values.email,
+          });
+          return { ok: true };
+        }
+        // Any other error (4xx, 5xx) — re-throw so the form shows it
+        throw networkErr;
+      }
+    } finally {
+      setIsPending(false);
+    }
   }, []);
 
   return { mutate, isPending };
 }
 
+// ── useRegister ───────────────────────────────────────────────────────────────
 export function useRegister() {
-  return useLogin();
+  const [isPending, setIsPending] = useState(false);
+
+  const mutate = useCallback(async (values: RegisterValues) => {
+    setIsPending(true);
+    try {
+      registerInputSchema.parse(values);
+
+      const res = await fetch(`${API_BASE}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name:     values.name,
+          email:    values.email,
+          password: values.password,
+        }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { message?: string }).message || `Registration failed (${res.status})`);
+      }
+
+      const data = await res.json() as { user?: { id: string; name: string; email: string } };
+      publishUser({
+        ...YOU,
+        id:    data.user?.id    ?? values.email,
+        name:  data.user?.name  ?? values.name,
+        email: data.user?.email ?? values.email,
+      });
+      return { ok: true };
+    } finally {
+      setIsPending(false);
+    }
+  }, []);
+
+  return { mutate, isPending };
 }
 
+// ── useUser ───────────────────────────────────────────────────────────────────
 export function useUser() {
   const [user, setUser] = useState<User | null>(currentUser);
 
@@ -70,11 +146,10 @@ export function useUser() {
   return { user, data: user, isLoading: false };
 }
 
+// ── useLogout ─────────────────────────────────────────────────────────────────
 export function useLogout() {
   return {
     isPending: false,
-    mutate: async () => {
-      publishUser(null);
-    },
+    mutate: async () => { publishUser(null); },
   };
 }
