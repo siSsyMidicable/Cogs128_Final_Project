@@ -1,7 +1,7 @@
 /**
  * /matching  — Find Skills to Trade
- * Springy card carousel of all potential swap partners.
- * Swipe left/right with a fluid, natural settle animation.
+ * Edge-to-edge infinite carousel — arrows are absolute overlays, no layout impact.
+ * Full register-screen glass-teal aesthetic: pinned title, glow orbs, grid overlay.
  */
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import {
@@ -14,146 +14,94 @@ import { MOCK_USERS, YOU } from '@/lib/matching/data';
 import { matchScore, getMatchingState, sendRequest } from '@/lib/matching/matching';
 
 const { width: SW } = Dimensions.get('window');
-const CARD_W   = Math.min(SW - 64, 300);
-const H_PAD    = 12;
-const GAP      = 20;
-const STEP     = CARD_W + H_PAD * 2 + GAP;
-const SIDE_PAD = (SW - CARD_W) / 2 - H_PAD;
+const CARD_W   = Math.min(SW - 48, 300);
+const GAP      = 16;
+const STEP     = CARD_W + GAP;
+const SIDE_PAD = (SW - CARD_W) / 2;
 
-const C = {
-  bg: '#7DE5E5', bgDeep: '#8FEBE5',
-  glass: 'rgba(255,255,255,0.55)', glassBorder: 'rgba(255,255,255,0.45)',
-  glowOne: 'rgba(255,255,255,0.22)', glowTwo: 'rgba(255,255,255,0.15)',
-  black: '#000', blackSoft: 'rgba(0,0,0,0.55)',
-  tealDark: '#2a8780', orange: '#FF8C42', shadow: '#000',
-};
+// ── Fluid spring ──────────────────────────────────────────────────────────────
+function useSettle() {
+  const tx   = useRef(new Animated.Value(0)).current;
+  const sc   = useRef(new Animated.Value(1)).current;
+  const anim = useRef<Animated.CompositeAnimation | null>(null);
 
-// ─── Fluid spring settle ───────────────────────────────────────────────────
-// Physics feel: low tension (lazy pull-back) + low friction (gentle overshoot)
-// produces an organic deceleration rather than a stiff snap.
-function useSettleAnim() {
-  const translateX = useRef(new Animated.Value(0)).current;
-  const scale      = useRef(new Animated.Value(1)).current;
-  const spring     = useRef<Animated.CompositeAnimation | null>(null);
-
-  const trigger = useCallback((fromDirection: 'left' | 'right' = 'right') => {
-    spring.current?.stop();
-
-    // Kick in from the arrival side — card "drifts in" naturally
-    translateX.setValue(fromDirection === 'right' ? 18 : -18);
-    scale.setValue(0.97); // subtle shrink at entry
-
-    spring.current = Animated.parallel([
-      // Lateral glide — soft tension so it lazily settles, not snaps
-      Animated.spring(translateX, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 38,    // low = slow, dreamy pull-back
-        friction: 7,    // mid = one gentle overshoot then rest
-        velocity: 2,
-      }),
-      // Subtle scale bloom — pops into full size as it settles
-      Animated.spring(scale, {
-        toValue: 1,
-        useNativeDriver: true,
-        tension: 50,
-        friction: 8,
-        velocity: 1,
-      }),
+  const fire = useCallback((dir: 'left' | 'right' = 'right') => {
+    anim.current?.stop();
+    tx.setValue(dir === 'right' ? 18 : -18);
+    sc.setValue(0.97);
+    anim.current = Animated.parallel([
+      Animated.spring(tx, { toValue: 0, useNativeDriver: true, tension: 38, friction: 7, velocity: 2 }),
+      Animated.spring(sc, { toValue: 1, useNativeDriver: true, tension: 50, friction: 8, velocity: 1 }),
     ]);
-    spring.current.start();
-  }, [translateX, scale]);
+    anim.current.start();
+  }, [tx, sc]);
 
-  return { translateX, scale, trigger };
+  return { tx, sc, fire };
 }
 
-// ─── Match card ──────────────────────────────────────────────────────────────
+// ── Match card ────────────────────────────────────────────────────────────────
 function MatchCard({
-  user, isActive, score, status, swipeDir, onRequest,
+  user, isActive, score, status, dir, onRequest,
 }: {
-  user: typeof MOCK_USERS[0];
-  isActive: boolean;
-  score: number;
-  status: 'none' | 'requested' | 'connected' | 'completed';
-  swipeDir: 'left' | 'right';
-  onRequest: () => void;
+  user: typeof MOCK_USERS[0]; isActive: boolean;
+  score: number; status: 'none' | 'requested' | 'connected' | 'completed';
+  dir: 'left' | 'right'; onRequest: () => void;
 }) {
-  const { translateX, scale, trigger } = useSettleAnim();
-  const wasActive = useRef(false);
-
+  const { tx, sc, fire } = useSettle();
+  const was = useRef(false);
   useEffect(() => {
-    if (isActive && !wasActive.current) {
-      wasActive.current = true;
-      trigger(swipeDir);
-    } else if (!isActive) {
-      wasActive.current = false;
-    }
-  }, [isActive, swipeDir, trigger]);
+    if (isActive && !was.current) { was.current = true; fire(dir); }
+    else if (!isActive) { was.current = false; }
+  }, [isActive, dir, fire]);
 
   const pct      = Math.round(score * 100);
-  const barColor = pct >= 70 ? C.tealDark : pct >= 50 ? C.orange : '#aaa';
-
+  const barColor = pct >= 70 ? '#2a8780' : pct >= 50 ? '#FF8C42' : '#aaa';
   const btnLabel =
-    status === 'connected' ? '🔄 Ongoing'     :
-    status === 'completed' ? '✅ Done'         :
-    status === 'requested' ? '⏳ Requested'   :
+    status === 'connected' ? '🔄 Ongoing'   :
+    status === 'completed' ? '✅ Done'       :
+    status === 'requested' ? '⏳ Requested' :
                              '🤝 Request Swap';
-
-  const btnDisabled = status !== 'none';
+  const disabled = status !== 'none';
 
   return (
-    <View style={[mc.wrapper, { width: CARD_W + H_PAD * 2 }]}>
+    <View style={{ width: CARD_W }}>
       <Animated.View
-        style={[
-          mc.animLayer,
-          isActive
-            ? { transform: [{ translateX }, { scale }] }
-            : { opacity: 0.60, transform: [{ scale: 0.95 }] },
-        ]}
+        style={isActive
+          ? { transform: [{ translateX: tx }, { scale: sc }] }
+          : { opacity: 0.58, transform: [{ scale: 0.95 }] }}
       >
-        <View style={[mc.glow, mc.glowOne]} />
-        <View style={[mc.glow, mc.glowTwo]} />
+        <View style={mc.glow1} />
+        <View style={mc.glow2} />
         <View style={mc.card}>
           <View style={mc.headerRow}>
             <Text style={mc.avatar}>{user.avatar}</Text>
             <View style={{ flex: 1 }}>
               <Text style={mc.name}>{user.name}</Text>
-              <Text style={mc.sub} numberOfLines={1}>
-                Offers: {user.offers.slice(0, 2).join(', ')}
-              </Text>
+              <Text style={mc.sub} numberOfLines={1}>Offers: {user.offers.slice(0, 2).join(', ')}</Text>
             </View>
             <View style={[mc.pctBadge, { backgroundColor: barColor }]}>
-              <Text style={mc.pctText}>{pct}%</Text>
+              <Text style={mc.pctTxt}>{pct}%</Text>
             </View>
           </View>
 
           <View style={mc.barTrack}>
             <View style={[mc.barFill, { width: `${pct}%` as any, backgroundColor: barColor }]} />
           </View>
-          <Text style={mc.barLabel}>Match score</Text>
+          <Text style={mc.barLbl}>Match score</Text>
 
-          <Text style={mc.sectionLabel}>Wants to learn</Text>
-          <View style={mc.chipRow}>
+          <Text style={mc.secLbl}>Wants to learn</Text>
+          <View style={mc.chips}>
             {user.requests.map(r => (
-              <View key={r} style={mc.chip}>
-                <Text style={mc.chipText}>{r}</Text>
-              </View>
+              <View key={r} style={mc.chip}><Text style={mc.chipTxt}>{r}</Text></View>
             ))}
           </View>
 
           <Pressable
-            onPress={btnDisabled ? undefined : onRequest}
-            style={({ pressed }) => [
-              mc.btn,
-              { backgroundColor: btnDisabled ? 'rgba(0,0,0,0.12)' : C.tealDark },
-              pressed && !btnDisabled && { opacity: 0.8 },
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={btnLabel}
+            onPress={disabled ? undefined : onRequest}
+            style={({ pressed }) => [mc.btn, { backgroundColor: disabled ? 'rgba(0,0,0,0.12)' : '#2a8780' }, pressed && !disabled && { opacity: 0.8 }]}
+            accessibilityRole="button" accessibilityLabel={btnLabel}
           >
-            <Text style={[mc.btnText, btnDisabled && { color: 'rgba(0,0,0,0.4)' }]}>
-              {btnLabel}
-            </Text>
+            <Text style={[mc.btnTxt, disabled && { color: 'rgba(0,0,0,0.4)' }]}>{btnLabel}</Text>
           </Pressable>
         </View>
       </Animated.View>
@@ -162,58 +110,165 @@ function MatchCard({
 }
 
 const mc = StyleSheet.create({
-  wrapper:   { paddingHorizontal: H_PAD, paddingVertical: 20, overflow: 'visible' },
-  animLayer: { overflow: 'visible' },
-  glow:      { position: 'absolute', left: H_PAD, right: H_PAD, top: 18, bottom: 18, borderRadius: 16 },
-  glowOne:   { backgroundColor: 'rgba(255,255,255,0.22)', transform: [{ scale: 1.07 }] },
-  glowTwo:   { backgroundColor: 'rgba(255,255,255,0.15)', transform: [{ scale: 1.12 }] },
-  card:      {
-    borderRadius: 14, padding: 18,
-    backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassBorder,
-    shadowColor: C.shadow, shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.22, shadowRadius: 14, elevation: 10,
-  },
-  headerRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
-  avatar:       { fontSize: 36 },
-  name:         { fontSize: 18, fontWeight: '800', color: C.black },
-  sub:          { fontSize: 12, color: C.blackSoft, marginTop: 2 },
-  pctBadge:     { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
-  pctText:      { fontSize: 13, fontWeight: '900', color: '#fff' },
-  barTrack:     { height: 6, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.1)', overflow: 'hidden', marginBottom: 4 },
-  barFill:      { height: 6, borderRadius: 3 },
-  barLabel:     { fontSize: 11, color: C.blackSoft, marginBottom: 14 },
-  sectionLabel: { fontSize: 12, fontWeight: '700', color: C.blackSoft, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 },
-  chipRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 18 },
-  chip:         { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: 'rgba(0,0,0,0.08)' },
-  chipText:     { fontSize: 12, fontWeight: '700', color: C.black },
-  btn:          { borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
-  btnText:      { fontSize: 15, fontWeight: '800', color: '#fff' },
+  glow1:    { position: 'absolute', inset: 0, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.22)', transform: [{ scale: 1.07 }] },
+  glow2:    { position: 'absolute', inset: 0, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.15)', transform: [{ scale: 1.12 }] },
+  card:     { borderRadius: 14, padding: 18, backgroundColor: 'rgba(255,255,255,0.55)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.45)', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.22, shadowRadius: 14, elevation: 10 },
+  headerRow:{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
+  avatar:   { fontSize: 36 },
+  name:     { fontSize: 18, fontWeight: '800', color: '#000' },
+  sub:      { fontSize: 12, color: 'rgba(0,0,0,0.55)', marginTop: 2 },
+  pctBadge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  pctTxt:   { fontSize: 13, fontWeight: '900', color: '#fff' },
+  barTrack: { height: 6, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.1)', overflow: 'hidden', marginBottom: 4 },
+  barFill:  { height: 6, borderRadius: 3 },
+  barLbl:   { fontSize: 11, color: 'rgba(0,0,0,0.55)', marginBottom: 14 },
+  secLbl:   { fontSize: 12, fontWeight: '700', color: 'rgba(0,0,0,0.55)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 },
+  chips:    { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 18 },
+  chip:     { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: 'rgba(0,0,0,0.08)' },
+  chipTxt:  { fontSize: 12, fontWeight: '700', color: '#000' },
+  btn:      { borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
+  btnTxt:   { fontSize: 15, fontWeight: '800', color: '#fff' },
 });
 
-// ─── Dots ─────────────────────────────────────────────────────────────────────
-function Dots({ count, active }: { count: number; active: number }) {
+// ── Dots ──────────────────────────────────────────────────────────────────────
+function Dots({ n, active }: { n: number; active: number }) {
   return (
-    <View style={d.row}>
-      {Array.from({ length: count }).map((_, i) => (
-        <View key={i} style={[d.dot, i === active ? d.on : d.off]} />
+    <View style={dt.row}>
+      {Array.from({ length: n }).map((_, i) => (
+        <View key={i} style={[dt.base, i === active ? dt.on : dt.off]} />
       ))}
     </View>
   );
 }
-const d = StyleSheet.create({
-  row: { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', marginTop: 10 },
-  dot: { borderRadius: 99 },
-  on:  { width: 22, height: 8, backgroundColor: '#000' },
-  off: { width: 8,  height: 8, backgroundColor: 'rgba(0,0,0,0.22)' },
+const dt = StyleSheet.create({
+  row:  { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+  base: { borderRadius: 99 },
+  on:   { width: 22, height: 8, backgroundColor: '#000' },
+  off:  { width: 8,  height: 8, backgroundColor: 'rgba(0,0,0,0.22)' },
 });
 
-// ─── Main screen ──────────────────────────────────────────────────────────────
-export default function MatchingScreen() {
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [prevIndex,   setPrevIndex]   = useState(0);
-  const [, forceUpdate] = useState(0);
-  const flatRef = useRef<FlatList>(null);
+// ── Infinite carousel ─────────────────────────────────────────────────────────
+function MatchCarousel({
+  scored, onRequest,
+}: {
+  scored: { user: typeof MOCK_USERS[0]; score: number; status: 'none' | 'requested' | 'connected' | 'completed' }[];
+  onRequest: (id: string) => void;
+}) {
+  const LOOP = Math.min(3, scored.length);
+  const LOOPED = [
+    ...scored.slice(-LOOP).map((c, i) => ({ ...c, _key: `pre-${i}` })),
+    ...scored.map((c, i) => ({ ...c, _key: `real-${i}` })),
+    ...scored.slice(0, LOOP).map((c, i) => ({ ...c, _key: `post-${i}` })),
+  ];
+  const REAL_OFF = LOOP;
+  const REAL_LEN = scored.length;
 
+  const [active, setActive] = useState(REAL_OFF);
+  const [prev,   setPrev]   = useState(REAL_OFF);
+  const listRef  = useRef<FlatList>(null);
+  const jumping  = useRef(false);
+  const realIdx  = ((active - REAL_OFF) % REAL_LEN + REAL_LEN) % REAL_LEN;
+  const dir      = active >= prev ? 'right' : 'left';
+
+  function maybeLoop(idx: number) {
+    let t: number | null = null;
+    if (idx < REAL_OFF)               t = idx + REAL_LEN;
+    else if (idx >= REAL_OFF + REAL_LEN) t = idx - REAL_LEN;
+    if (t !== null && !jumping.current) {
+      jumping.current = true;
+      listRef.current?.scrollToIndex({ index: t, animated: false });
+      setActive(t); setPrev(t);
+      setTimeout(() => { jumping.current = false; }, 80);
+    }
+  }
+
+  const onView = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    if (jumping.current) return;
+    if (viewableItems.length > 0 && viewableItems[0].index !== null) {
+      const n = viewableItems[0].index!;
+      setActive(p => { setPrev(p); return n; });
+      maybeLoop(n);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [LOOPED.length]);
+
+  const vCfg = useRef({ itemVisiblePercentThreshold: 55 }).current;
+
+  useEffect(() => {
+    listRef.current?.scrollToIndex({ index: REAL_OFF, animated: false });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function goTo(delta: number) {
+    if (jumping.current) return;
+    const n = Math.max(0, Math.min(LOOPED.length - 1, active + delta));
+    setPrev(active);
+    listRef.current?.scrollToIndex({ index: n, animated: true });
+    setActive(n);
+    setTimeout(() => maybeLoop(n), 350);
+  }
+
+  return (
+    <View style={cr.wrap}>
+      <FlatList
+        ref={listRef}
+        data={LOOPED}
+        keyExtractor={item => item._key}
+        horizontal
+        pagingEnabled={false}
+        snapToInterval={STEP}
+        snapToAlignment="center"
+        decelerationRate="fast"
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: SIDE_PAD }}
+        getItemLayout={(_, i) => ({ length: STEP, offset: STEP * i, index: i })}
+        renderItem={({ item, index }) => (
+          <View style={{ width: STEP, alignItems: 'center', paddingVertical: 16 }}>
+            <MatchCard
+              user={item.user} isActive={index === active}
+              score={item.score} status={item.status}
+              dir={dir} onRequest={() => onRequest(item.user.id)}
+            />
+          </View>
+        )}
+        onViewableItemsChanged={onView}
+        viewabilityConfig={vCfg}
+      />
+
+      {/* Arrows: absolutely positioned — zero layout footprint */}
+      <Pressable
+        onPress={() => goTo(-1)}
+        style={[cr.arrow, cr.arrowL]}
+        accessibilityRole="button" accessibilityLabel="Previous"
+        hitSlop={{ top: 16, bottom: 16, left: 12, right: 12 }}
+      >
+        <Text style={cr.arrowTxt}>‹</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => goTo(1)}
+        style={[cr.arrow, cr.arrowR]}
+        accessibilityRole="button" accessibilityLabel="Next"
+        hitSlop={{ top: 16, bottom: 16, left: 12, right: 12 }}
+      >
+        <Text style={cr.arrowTxt}>›</Text>
+      </Pressable>
+
+      <Dots n={REAL_LEN} active={realIdx} />
+    </View>
+  );
+}
+
+const cr = StyleSheet.create({
+  wrap:    { width: '100%', alignItems: 'center' },
+  arrow:   { position: 'absolute', top: '50%', marginTop: -28, zIndex: 10, width: 40, height: 56, alignItems: 'center', justifyContent: 'center' },
+  arrowL:  { left: 2 },
+  arrowR:  { right: 2 },
+  arrowTxt: { fontSize: 32, fontWeight: '900', color: '#2a8780', lineHeight: 38 },
+});
+
+// ── Main screen ───────────────────────────────────────────────────────────────
+export default function MatchingScreen() {
+  const [tick, setTick] = useState(0);
   const state  = getMatchingState();
   const scored = MOCK_USERS.map(u => ({
     user: u,
@@ -225,29 +280,17 @@ export default function MatchingScreen() {
     ) as 'none' | 'requested' | 'connected' | 'completed',
   })).sort((a, b) => b.score - a.score);
 
-  const swipeDir = activeIndex >= prevIndex ? 'right' : 'left';
-
-  const onViewable = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
-    if (viewableItems.length > 0 && viewableItems[0].index !== null) {
-      const next = viewableItems[0].index!;
-      setActiveIndex(prev => { setPrevIndex(prev); return next; });
-    }
-  }, []);
-
-  const viewCfg = useRef({ itemVisiblePercentThreshold: 55 }).current;
-
-  const goTo = (idx: number) => {
-    const c = Math.max(0, Math.min(scored.length - 1, idx));
-    setPrevIndex(activeIndex);
-    flatRef.current?.scrollToIndex({ index: c, animated: true });
-    setActiveIndex(c);
-  };
-
   return (
     <SafeAreaView style={s.safe}>
       <StatusBar barStyle="dark-content" />
+      {/* Full-bleed teal background */}
       <View style={s.bgLayer} />
+      <View style={s.grid} />
+      {/* Glow orbs — same as register/login */}
+      <View style={[s.glow, s.glowOut]} />
+      <View style={[s.glow, s.glowIn]} />
 
+      {/* Pinned header — logo stays locked */}
       <View style={s.header}>
         <Pressable
           onPress={() => router.back()}
@@ -256,72 +299,29 @@ export default function MatchingScreen() {
         >
           <Text style={s.backArrow}>‹</Text>
         </Pressable>
-        <View style={{ flex: 1, alignItems: 'center' }}>
+        <View style={s.headerCenter}>
           <Text style={s.title}>Find Skills to Trade</Text>
-          <Text style={s.subtitle}>Swipe to browse — tap to request</Text>
+          <Text style={s.subtitle}>Swipe to browse · tap to request</Text>
         </View>
         <View style={{ width: 44 }} />
       </View>
 
-      <View style={s.carousel}>
-        <View style={s.arrowRow}>
-          <Pressable
-            onPress={() => goTo(activeIndex - 1)}
-            disabled={activeIndex === 0}
-            style={({ pressed }) => [s.arrow, activeIndex === 0 && s.arrowOff, pressed && { opacity: 0.6 }]}
-            accessibilityRole="button" accessibilityLabel="Previous"
-          >
-            <Text style={[s.arrowTxt, activeIndex === 0 && s.arrowTxtOff]}>‹</Text>
-          </Pressable>
-
-          <View style={{ flex: 1, overflow: 'visible' }}>
-            <FlatList
-              ref={flatRef}
-              data={scored}
-              keyExtractor={item => item.user.id}
-              horizontal
-              pagingEnabled={false}
-              snapToInterval={STEP}
-              snapToAlignment="center"
-              decelerationRate="fast"
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: SIDE_PAD, paddingVertical: 20, gap: GAP }}
-              renderItem={({ item, index }) => (
-                <MatchCard
-                  user={item.user}
-                  isActive={index === activeIndex}
-                  score={item.score}
-                  status={item.status}
-                  swipeDir={swipeDir}
-                  onRequest={() => { sendRequest(item.user.id); forceUpdate(n => n + 1); }}
-                />
-              )}
-              onViewableItemsChanged={onViewable}
-              viewabilityConfig={viewCfg}
-            />
-          </View>
-
-          <Pressable
-            onPress={() => goTo(activeIndex + 1)}
-            disabled={activeIndex === scored.length - 1}
-            style={({ pressed }) => [s.arrow, activeIndex === scored.length - 1 && s.arrowOff, pressed && { opacity: 0.6 }]}
-            accessibilityRole="button" accessibilityLabel="Next"
-          >
-            <Text style={[s.arrowTxt, activeIndex === scored.length - 1 && s.arrowTxtOff]}>›</Text>
-          </Pressable>
-        </View>
-
-        <Dots count={scored.length} active={activeIndex} />
-        <Text style={s.tip}>← Swipe to browse · Tap Request to send a swap →</Text>
+      {/* Edge-to-edge carousel */}
+      <View style={{ flex: 1 }}>
+        <MatchCarousel
+          scored={scored}
+          onRequest={(id) => { sendRequest(id); setTick(n => n + 1); }}
+        />
+        <Text style={s.tip}>← Swipe to browse · Tap Request to swap →</Text>
       </View>
 
       <View style={s.footer}>
         <Pressable
           onPress={() => router.replace('/transaction')}
-          style={({ pressed }) => [s.hubBtn, pressed && { opacity: 0.82 }]}
+          style={({ pressed }) => [s.footerBtn, pressed && { opacity: 0.82 }]}
           accessibilityRole="button" accessibilityLabel="Back to swap hub"
         >
-          <Text style={s.hubBtnText}>← Back to Swap Hub</Text>
+          <Text style={s.footerBtnTxt}>← Back to Swap Hub</Text>
         </Pressable>
       </View>
     </SafeAreaView>
@@ -329,21 +329,20 @@ export default function MatchingScreen() {
 }
 
 const s = StyleSheet.create({
-  safe:      { flex: 1, backgroundColor: '#8FEBE5' },
-  bgLayer:   { ...StyleSheet.absoluteFillObject, backgroundColor: '#7DE5E5' },
-  header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4 },
-  backBtn:   { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  backArrow: { fontSize: 32, fontWeight: '900', color: '#2a8780', lineHeight: 36 },
-  title:     { fontSize: 22, fontWeight: '800', color: '#000' },
-  subtitle:  { fontSize: 13, color: 'rgba(0,0,0,0.6)', marginTop: 2 },
-  carousel:  { flex: 1, alignItems: 'center', overflow: 'visible' },
-  arrowRow:  { flexDirection: 'row', alignItems: 'center', width: '100%', overflow: 'visible', flex: 1 },
-  arrow:     { width: 36, height: 52, alignItems: 'center', justifyContent: 'center' },
-  arrowOff:  { opacity: 0.22 },
-  arrowTxt:  { fontSize: 32, fontWeight: '900', color: '#2a8780', lineHeight: 36 },
-  arrowTxtOff: { color: 'rgba(0,0,0,0.3)' },
-  tip:       { fontSize: 12, color: 'rgba(0,0,0,0.45)', marginTop: 10, marginBottom: 4, textAlign: 'center' },
-  footer:    { paddingHorizontal: 20, paddingBottom: 24 },
-  hubBtn:    { borderRadius: 8, paddingVertical: 13, backgroundColor: '#2a8780', alignItems: 'center' },
-  hubBtnText: { fontSize: 15, fontWeight: '800', color: '#fff' },
+  safe:         { flex: 1, backgroundColor: '#8FEBE5' },
+  bgLayer:      { ...StyleSheet.absoluteFillObject, backgroundColor: '#7DE5E5' },
+  grid:         { ...StyleSheet.absoluteFillObject, opacity: 0.10, borderColor: 'rgba(0,0,0,0.2)', borderWidth: 0.5 },
+  glow:         { position: 'absolute', borderRadius: 100, top: 40, alignSelf: 'center' },
+  glowOut:      { width: 240, height: 90, backgroundColor: 'rgba(0,0,0,0.07)', transform: [{ scale: 1.4 }] },
+  glowIn:       { width: 220, height: 80, backgroundColor: 'rgba(0,0,0,0.05)', transform: [{ scale: 1.2 }] },
+  header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingTop: 12, paddingBottom: 4 },
+  backBtn:      { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  backArrow:    { fontSize: 32, fontWeight: '900', color: '#2a8780', lineHeight: 36 },
+  headerCenter: { flex: 1, alignItems: 'center' },
+  title:        { fontSize: 22, fontWeight: '800', color: '#000' },
+  subtitle:     { fontSize: 13, color: 'rgba(0,0,0,0.6)', marginTop: 2 },
+  tip:          { fontSize: 12, color: 'rgba(0,0,0,0.45)', textAlign: 'center', marginTop: 4, marginBottom: 8 },
+  footer:       { paddingHorizontal: 20, paddingBottom: 24 },
+  footerBtn:    { borderRadius: 8, paddingVertical: 13, backgroundColor: '#2a8780', alignItems: 'center' },
+  footerBtnTxt: { fontSize: 15, fontWeight: '800', color: '#fff' },
 });

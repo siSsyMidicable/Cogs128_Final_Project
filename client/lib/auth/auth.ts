@@ -3,14 +3,20 @@ import { useCallback, useEffect, useState } from 'react';
 import { YOU } from '@/lib/matching/data';
 import type { MatchUser } from '@/lib/matching/matching';
 
+// Permissive email regex — allows special chars like $ in local part (e.g. si$sy@demo.com)
+const permissiveEmail = z.string().regex(
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+  'Please enter a valid email address',
+);
+
 export const loginInputSchema = z.object({
-  email: z.string().email(),
+  email: permissiveEmail,
   password: z.string().min(1),
 });
 
 export const registerInputSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email(),
+  email: permissiveEmail,
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string(),
 }).refine((d) => d.password === d.confirmPassword, {
@@ -34,13 +40,16 @@ function publishUser(user: User | null) {
 // ── Resolve API base from tunnel env or local fallback ───────────────────────
 const API_BASE: string = (() => {
   try {
-    // Works in Expo via babel-plugin-transform-inline-env
     const tunnel = (process.env as Record<string,string | undefined>).EXPO_PUBLIC_TUNNEL_URL ||
                    (process.env as Record<string,string | undefined>).TUNNEL_URL;
     if (tunnel) return tunnel.replace(/\/$/, '');
   } catch { /* ignore */ }
   return 'http://localhost:3000';
 })();
+
+// Demo credentials — bypass network entirely
+const DEMO_EMAIL    = 'si$sy@demo.com';
+const DEMO_PASSWORD = 'password';
 
 // ── useLogin ─────────────────────────────────────────────────────────────────
 export function useLogin() {
@@ -50,6 +59,16 @@ export function useLogin() {
     setIsPending(true);
     try {
       loginInputSchema.parse(values);
+
+      // ── Demo short-circuit: always succeeds, no network needed ──────────
+      if (
+        values.email.toLowerCase() === DEMO_EMAIL.toLowerCase() &&
+        values.password === DEMO_PASSWORD
+      ) {
+        await new Promise((r) => setTimeout(r, 280)); // tiny fake delay
+        publishUser({ ...YOU, id: DEMO_EMAIL, name: 'Sissy', email: DEMO_EMAIL });
+        return { ok: true };
+      }
 
       // Try real Neon API first
       try {
@@ -71,9 +90,7 @@ export function useLogin() {
         });
         return { ok: true };
       } catch (networkErr) {
-        // If the server is unreachable (offline dev), fall back to local mock
         if (networkErr instanceof TypeError) {
-          // TypeError = "Failed to fetch" = no network — safe to mock
           await new Promise((r) => setTimeout(r, 300));
           publishUser({
             ...YOU,
@@ -83,7 +100,6 @@ export function useLogin() {
           });
           return { ok: true };
         }
-        // Any other error (4xx, 5xx) — re-throw so the form shows it
         throw networkErr;
       }
     } finally {
