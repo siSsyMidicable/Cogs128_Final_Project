@@ -1,18 +1,18 @@
 /**
  * /matching  — Find Skills to Trade
  * Springy card carousel of all potential swap partners.
- * Swipe left/right with a fluid settle animation (spring overshoot).
+ * Swipe left/right with a fluid, natural settle animation.
  */
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, Pressable, StatusBar,
   Dimensions, FlatList, Animated, ViewToken,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { useUser } from '@/lib/auth/auth';
 import { MOCK_USERS, YOU } from '@/lib/matching/data';
-import { computeMatchScore, getMatchingState, sendRequest } from '@/lib/matching/matching';
+// ✔️ Fix: correct function name is matchScore, not computeMatchScore
+import { matchScore, getMatchingState, sendRequest } from '@/lib/matching/matching';
 
 const { width: SW } = Dimensions.get('window');
 const CARD_W   = Math.min(SW - 64, 300);
@@ -22,53 +22,32 @@ const STEP     = CARD_W + H_PAD * 2 + GAP;
 const SIDE_PAD = (SW - CARD_W) / 2 - H_PAD;
 
 const C = {
-  bg:          '#7DE5E5',
-  bgDeep:      '#8FEBE5',
-  glass:       'rgba(255,255,255,0.55)',
-  glassBorder: 'rgba(255,255,255,0.45)',
-  glowOne:     'rgba(255,255,255,0.22)',
-  glowTwo:     'rgba(255,255,255,0.15)',
-  black:       '#000000',
-  blackMid:    'rgba(0,0,0,0.78)',
-  blackSoft:   'rgba(0,0,0,0.55)',
-  tealDark:    '#2a8780',
-  orange:      '#FF8C42',
-  shadow:      '#000',
+  bg: '#7DE5E5', bgDeep: '#8FEBE5',
+  glass: 'rgba(255,255,255,0.55)', glassBorder: 'rgba(255,255,255,0.45)',
+  glowOne: 'rgba(255,255,255,0.22)', glowTwo: 'rgba(255,255,255,0.15)',
+  black: '#000', blackSoft: 'rgba(0,0,0,0.55)',
+  tealDark: '#2a8780', orange: '#FF8C42', shadow: '#000',
 };
 
-// ─── Spring settle animation ──────────────────────────────────────────────────
-// When a card becomes active, it wobbles left→right→settle like a real object.
+// ─── Natural spring settle ──────────────────────────────────────────────────
+// One spring from an offset to 0 — tension/friction controls the feel.
+// This is physics-based, not a scripted sequence, so it decelerates organically.
 function useSettleAnim() {
   const anim = useRef(new Animated.Value(0)).current;
+  const spring = useRef<Animated.CompositeAnimation | null>(null);
 
-  const trigger = useCallback(() => {
-    anim.setValue(0);
-    Animated.sequence([
-      Animated.spring(anim, {
-        toValue: -8,
-        useNativeDriver: true,
-        speed: 40,
-        bounciness: 18,
-      }),
-      Animated.spring(anim, {
-        toValue: 6,
-        useNativeDriver: true,
-        speed: 40,
-        bounciness: 14,
-      }),
-      Animated.spring(anim, {
-        toValue: -3,
-        useNativeDriver: true,
-        speed: 40,
-        bounciness: 10,
-      }),
-      Animated.spring(anim, {
-        toValue: 0,
-        useNativeDriver: true,
-        speed: 30,
-        bounciness: 6,
-      }),
-    ]).start();
+  const trigger = useCallback((fromDirection: 'left' | 'right' = 'right') => {
+    spring.current?.stop();
+    // Start offset in the direction the swipe came from
+    anim.setValue(fromDirection === 'right' ? 14 : -14);
+    spring.current = Animated.spring(anim, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 60,      // how fast it pulls back to 0 (lower = slower, lazier)
+      friction: 6,      // how much it oscillates (lower = more wobble, higher = overdamped)
+      velocity: 0,
+    });
+    spring.current.start();
   }, [anim]);
 
   return { anim, trigger };
@@ -76,33 +55,35 @@ function useSettleAnim() {
 
 // ─── Match card ────────────────────────────────────────────────────────────────
 function MatchCard({
-  user, isActive, score, status, onRequest,
+  user, isActive, score, status, swipeDir, onRequest,
 }: {
   user: typeof MOCK_USERS[0];
   isActive: boolean;
   score: number;
   status: 'none' | 'requested' | 'connected' | 'completed';
+  swipeDir: 'left' | 'right';
   onRequest: () => void;
 }) {
   const { anim, trigger } = useSettleAnim();
-
-  // Trigger wobble every time this card becomes the focused one
   const wasActive = useRef(false);
-  if (isActive && !wasActive.current) {
-    wasActive.current = true;
-    trigger();
-  } else if (!isActive) {
-    wasActive.current = false;
-  }
 
-  const pct       = Math.round(score * 100);
-  const barColor  = pct >= 70 ? C.tealDark : pct >= 50 ? C.orange : '#aaa';
+  useEffect(() => {
+    if (isActive && !wasActive.current) {
+      wasActive.current = true;
+      trigger(swipeDir);
+    } else if (!isActive) {
+      wasActive.current = false;
+    }
+  }, [isActive, swipeDir, trigger]);
+
+  const pct      = Math.round(score * 100);
+  const barColor = pct >= 70 ? C.tealDark : pct >= 50 ? C.orange : '#aaa';
 
   const btnLabel =
-    status === 'connected'  ? '🔄 Ongoing'    :
-    status === 'completed'  ? '✅ Done'        :
-    status === 'requested'  ? '⏳ Requested'  :
-                              '🤝 Request Swap';
+    status === 'connected' ? '🔄 Ongoing'     :
+    status === 'completed' ? '✅ Done'         :
+    status === 'requested' ? '⏳ Requested'   :
+                             '🤝 Request Swap';
 
   const btnDisabled = status !== 'none';
 
@@ -113,15 +94,12 @@ function MatchCard({
           mc.animLayer,
           isActive
             ? { transform: [{ translateX: anim }] }
-            : { opacity: 0.62, transform: [{ scale: 0.96 }] },
+            : { opacity: 0.60, transform: [{ scale: 0.95 }] },
         ]}
       >
-        {/* glow halos */}
         <View style={[mc.glow, mc.glowOne]} />
         <View style={[mc.glow, mc.glowTwo]} />
-
         <View style={mc.card}>
-          {/* Avatar + name */}
           <View style={mc.headerRow}>
             <Text style={mc.avatar}>{user.avatar}</Text>
             <View style={{ flex: 1 }}>
@@ -135,13 +113,11 @@ function MatchCard({
             </View>
           </View>
 
-          {/* Match bar */}
           <View style={mc.barTrack}>
             <View style={[mc.barFill, { width: `${pct}%` as any, backgroundColor: barColor }]} />
           </View>
           <Text style={mc.barLabel}>Match score</Text>
 
-          {/* Skills they want */}
           <Text style={mc.sectionLabel}>Wants to learn</Text>
           <View style={mc.chipRow}>
             {user.requests.map(r => (
@@ -151,7 +127,6 @@ function MatchCard({
             ))}
           </View>
 
-          {/* CTA */}
           <Pressable
             onPress={btnDisabled ? undefined : onRequest}
             style={({ pressed }) => [
@@ -173,72 +148,77 @@ function MatchCard({
 }
 
 const mc = StyleSheet.create({
-  wrapper:    { paddingHorizontal: H_PAD, paddingVertical: 20, overflow: 'visible' },
-  animLayer:  { overflow: 'visible' },
-  glow:       { position: 'absolute', left: H_PAD, right: H_PAD, top: 18, bottom: 18, borderRadius: 16 },
-  glowOne:    { backgroundColor: 'rgba(255,255,255,0.22)', transform: [{ scale: 1.07 }] },
-  glowTwo:    { backgroundColor: 'rgba(255,255,255,0.15)', transform: [{ scale: 1.12 }] },
-  card:       {
+  wrapper:   { paddingHorizontal: H_PAD, paddingVertical: 20, overflow: 'visible' },
+  animLayer: { overflow: 'visible' },
+  glow:      { position: 'absolute', left: H_PAD, right: H_PAD, top: 18, bottom: 18, borderRadius: 16 },
+  glowOne:   { backgroundColor: 'rgba(255,255,255,0.22)', transform: [{ scale: 1.07 }] },
+  glowTwo:   { backgroundColor: 'rgba(255,255,255,0.15)', transform: [{ scale: 1.12 }] },
+  card:      {
     borderRadius: 14, padding: 18,
     backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassBorder,
     shadowColor: C.shadow, shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.22, shadowRadius: 14, elevation: 10,
   },
-  headerRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
-  avatar:     { fontSize: 36 },
-  name:       { fontSize: 18, fontWeight: '800', color: C.black },
-  sub:        { fontSize: 12, color: C.blackSoft, marginTop: 2 },
-  pctBadge:   { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
-  pctText:    { fontSize: 13, fontWeight: '900', color: '#fff' },
-  barTrack:   { height: 6, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.1)', overflow: 'hidden', marginBottom: 4 },
-  barFill:    { height: 6, borderRadius: 3 },
-  barLabel:   { fontSize: 11, color: C.blackSoft, marginBottom: 14 },
+  headerRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
+  avatar:       { fontSize: 36 },
+  name:         { fontSize: 18, fontWeight: '800', color: C.black },
+  sub:          { fontSize: 12, color: C.blackSoft, marginTop: 2 },
+  pctBadge:     { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  pctText:      { fontSize: 13, fontWeight: '900', color: '#fff' },
+  barTrack:     { height: 6, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.1)', overflow: 'hidden', marginBottom: 4 },
+  barFill:      { height: 6, borderRadius: 3 },
+  barLabel:     { fontSize: 11, color: C.blackSoft, marginBottom: 14 },
   sectionLabel: { fontSize: 12, fontWeight: '700', color: C.blackSoft, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 },
-  chipRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 18 },
-  chip:       { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: 'rgba(0,0,0,0.08)' },
-  chipText:   { fontSize: 12, fontWeight: '700', color: C.black },
-  btn:        { borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
-  btnText:    { fontSize: 15, fontWeight: '800', color: '#fff' },
+  chipRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 18 },
+  chip:         { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: 'rgba(0,0,0,0.08)' },
+  chipText:     { fontSize: 12, fontWeight: '700', color: C.black },
+  btn:          { borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
+  btnText:      { fontSize: 15, fontWeight: '800', color: '#fff' },
 });
 
-// ─── Dot indicators ───────────────────────────────────────────────────────────
+// ─── Dots ──────────────────────────────────────────────────────────────────────
 function Dots({ count, active }: { count: number; active: number }) {
   return (
-    <View style={dots.row}>
+    <View style={d.row}>
       {Array.from({ length: count }).map((_, i) => (
-        <View key={i} style={[dots.dot, i === active ? dots.active : dots.inactive]} />
+        <View key={i} style={[d.dot, i === active ? d.on : d.off]} />
       ))}
     </View>
   );
 }
-const dots = StyleSheet.create({
-  row:      { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', marginTop: 10 },
-  dot:      { borderRadius: 99 },
-  active:   { width: 22, height: 8, backgroundColor: '#000' },
-  inactive: { width: 8,  height: 8, backgroundColor: 'rgba(0,0,0,0.22)' },
+const d = StyleSheet.create({
+  row: { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', marginTop: 10 },
+  dot: { borderRadius: 99 },
+  on:  { width: 22, height: 8, backgroundColor: '#000' },
+  off: { width: 8,  height: 8, backgroundColor: 'rgba(0,0,0,0.22)' },
 });
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export default function MatchingScreen() {
-  const { user } = useUser();
   const [activeIndex, setActiveIndex] = useState(0);
+  const [prevIndex,   setPrevIndex]   = useState(0);
   const [, forceUpdate] = useState(0);
   const flatRef = useRef<FlatList>(null);
 
-  const state    = getMatchingState();
-  const scored   = MOCK_USERS.map(u => ({
+  const state  = getMatchingState();
+  const scored = MOCK_USERS.map(u => ({
     user: u,
-    score: computeMatchScore(YOU, u),
+    // ✔️ correct function: matchScore returns a breakdown object; use .total
+    score: matchScore(YOU, u).total,
     status: (
-      state.completed.has(u.id) ? 'completed' :
+      state.completed.has(u.id)   ? 'completed' :
       state.connections.has(u.id) ? 'connected' :
-      state.requests.has(u.id) ? 'requested' : 'none'
+      state.requests.has(u.id)    ? 'requested' : 'none'
     ) as 'none' | 'requested' | 'connected' | 'completed',
   })).sort((a, b) => b.score - a.score);
 
+  const swipeDir = activeIndex >= prevIndex ? 'right' : 'left';
+
   const onViewable = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     if (viewableItems.length > 0 && viewableItems[0].index !== null) {
-      setActiveIndex(viewableItems[0].index!);
+      const next = viewableItems[0].index!;
+      setPrevIndex(i => { return i; }); // capture before update
+      setActiveIndex(prev => { setPrevIndex(prev); return next; });
     }
   }, []);
 
@@ -246,6 +226,7 @@ export default function MatchingScreen() {
 
   const goTo = (idx: number) => {
     const c = Math.max(0, Math.min(scored.length - 1, idx));
+    setPrevIndex(activeIndex);
     flatRef.current?.scrollToIndex({ index: c, animated: true });
     setActiveIndex(c);
   };
@@ -255,7 +236,6 @@ export default function MatchingScreen() {
       <StatusBar barStyle="dark-content" />
       <View style={s.bgLayer} />
 
-      {/* Header */}
       <View style={s.header}>
         <Pressable
           onPress={() => router.back()}
@@ -271,10 +251,8 @@ export default function MatchingScreen() {
         <View style={{ width: 44 }} />
       </View>
 
-      {/* Carousel */}
       <View style={s.carousel}>
         <View style={s.arrowRow}>
-          {/* Left */}
           <Pressable
             onPress={() => goTo(activeIndex - 1)}
             disabled={activeIndex === 0}
@@ -295,21 +273,15 @@ export default function MatchingScreen() {
               snapToAlignment="center"
               decelerationRate="fast"
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{
-                paddingHorizontal: SIDE_PAD,
-                paddingVertical: 20,
-                gap: GAP,
-              }}
+              contentContainerStyle={{ paddingHorizontal: SIDE_PAD, paddingVertical: 20, gap: GAP }}
               renderItem={({ item, index }) => (
                 <MatchCard
                   user={item.user}
                   isActive={index === activeIndex}
                   score={item.score}
                   status={item.status}
-                  onRequest={() => {
-                    sendRequest(item.user.id);
-                    forceUpdate(n => n + 1);
-                  }}
+                  swipeDir={swipeDir}
+                  onRequest={() => { sendRequest(item.user.id); forceUpdate(n => n + 1); }}
                 />
               )}
               onViewableItemsChanged={onViewable}
@@ -317,7 +289,6 @@ export default function MatchingScreen() {
             />
           </View>
 
-          {/* Right */}
           <Pressable
             onPress={() => goTo(activeIndex + 1)}
             disabled={activeIndex === scored.length - 1}
@@ -329,12 +300,9 @@ export default function MatchingScreen() {
         </View>
 
         <Dots count={scored.length} active={activeIndex} />
-
-        {/* Tip */}
         <Text style={s.tip}>← Swipe to browse · Tap Request to send a swap →</Text>
       </View>
 
-      {/* Back to hub */}
       <View style={s.footer}>
         <Pressable
           onPress={() => router.replace('/transaction')}
