@@ -1,1 +1,1 @@
-{cat /tmp/transaction_index_patched.tsx}
+{content}
