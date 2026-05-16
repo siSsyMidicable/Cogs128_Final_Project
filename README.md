@@ -85,7 +85,7 @@ You do **not** need to clone this repo or run any commands. Just use the **Expo 
 
 ### Step 2 — Open the project link
 
-Ask whoever is running the dev server (usually Midicable) to share the **QR code** or the **exp:// URL** that appears when they run:
+Ask whoever is running the dev server (usually Nachtoria) to share the **QR code** or the **exp:// URL** that appears when they run:
 
 ```bash
 cd client
