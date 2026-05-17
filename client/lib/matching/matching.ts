@@ -12,7 +12,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─ Types ──────────────────────────────────────────────────────────────────────────────
 
 export type MatchUser = {
   id: string;
@@ -74,27 +74,28 @@ export type HistoryRecord = {
   proof: ProofField;
   fairness: number;
   scores: MatchScoreBreakdown;
-  /** 1–5 star rating given by the user at swap completion */
   starRating?: number;
-  /** Optional freeform review comment */
   reviewComment?: string;
 };
 
-// ─── Core Math ────────────────────────────────────────────────────────────────
+// ─ TrustComponents — weights as plain number (not literal types) ────────────
+// Numeric literal types like `weight: 0.2` cause TS errors in strict mode;
+// using `number` here is identical at runtime.
+export type TrustComponents = {
+  P:    { weight: number; value: number };
+  Rhat: { weight: number; value: number };
+  Vhat: { weight: number; value: number };
+  C:    { weight: number; value: number };
+  Q:    { weight: number; value: number };
+};
+
+// ─ Core Math ──────────────────────────────────────────────────────────────────────
 
 export function trustScore(u: MatchUser): number {
   const rHat = (u.rating - 1) / 4;
   const vHat = u.verified / 2;
   return 0.2 * u.portfolio + 0.3 * rHat + 0.2 * vHat + 0.2 * u.consistency + 0.1 * u.communication;
 }
-
-export type TrustComponents = {
-  P:  { weight: 0.2; value: number };
-  Rhat: { weight: 0.3; value: number };
-  Vhat: { weight: 0.2; value: number };
-  C:  { weight: 0.2; value: number };
-  Q:  { weight: 0.1; value: number };
-};
 
 export function trustComponents(u: MatchUser): TrustComponents {
   return {
@@ -143,7 +144,7 @@ export function whyThisMatch(
   } else if (theyGiveYou.length > 0) {
     fitSentence = `${other.name} covers ${theyGiveYou.length} of your ${you.requests.length} skill need${you.requests.length !== 1 ? 's' : ''}: ${theyGiveYou.join(', ')}.`;
   } else if (youGiveThem.length > 0) {
-    fitSentence = `You offer ${youGiveThem.join(' & ')} which ${other.name} needs, but they don't cover your current skill requests.`;
+    fitSentence = `You offer ${youGiveThem.join(' & ')} which ${other.name} needs, but they don’t cover your current skill requests.`;
   } else {
     fitSentence = `No direct skill overlap — ranked on trust compatibility alone (TC=${scores.tc.toFixed(2)}).`;
   }
@@ -158,7 +159,7 @@ export function whyThisMatch(
   return `${fitSentence} ${trustSentence}`;
 }
 
-// ─── Module-Level State ───────────────────────────────────────────────────────
+// ─ Module-Level State ────────────────────────────────────────────────────────────
 
 let _connections = new Set<string>();
 let _requests    = new Set<string>();
@@ -178,10 +179,6 @@ export function confirmConnect(userId: string) {
   _notify();
 }
 
-/**
- * declineRequest — remove from pending requests without connecting.
- * Added to support the Incoming screen Decline action.
- */
 export function declineRequest(userId: string) {
   _requests.delete(userId);
   _notify();
@@ -219,14 +216,12 @@ export function completeSwap(
   _notify();
 }
 
-/** Returns the average star rating for a given partnerId (across all completed swaps) */
 export function averageStarRating(partnerId: string): number | null {
   const records = _history.filter(r => r.partnerId === partnerId && r.starRating !== undefined);
   if (records.length === 0) return null;
   return records.reduce((sum, r) => sum + (r.starRating ?? 0), 0) / records.length;
 }
 
-/** Returns total number of completed swaps for a given partnerId */
 export function swapCount(partnerId: string): number {
   return _history.filter(r => r.partnerId === partnerId).length;
 }
