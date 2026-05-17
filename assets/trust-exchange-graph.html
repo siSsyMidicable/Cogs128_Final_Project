@@ -62,6 +62,7 @@ h1{
 </head>
 <body>
 <div id="cy"></div>
+
 <div id="glass">
   <h1>Trust Exchange</h1>
   <div class="legend">
@@ -71,6 +72,46 @@ h1{
     <div class="item"><div class="dot" style="background:#ff4fa3"></div> Fairness</div>
   </div>
 </div>
+
+<style>
+  #glass {
+    transition: opacity 0.3s ease;
+  }
+
+  #glass.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+</style>
+
+<script>
+  const glass = document.getElementById("glass");
+  let nearTimer = null;
+
+  function hideGlass() {
+    glass.classList.add("hidden");
+  }
+
+  function showGlass() {
+    glass.classList.remove("hidden");
+  }
+
+  // show first, then hide after a few seconds
+  showGlass();
+  setTimeout(hideGlass, 3000); // change 3000 to whatever you want
+
+  // when mouse gets near the element, wait 5 seconds before showing it
+  glass.addEventListener("mouseenter", () => {
+    clearTimeout(nearTimer);
+    nearTimer = setTimeout(() => {
+      showGlass();
+    }, 5000);
+  });
+
+  glass.addEventListener("mouseleave", () => {
+    clearTimeout(nearTimer);
+  });
+</script>
 <script>
 const cy = cytoscape({
 container: document.getElementById('cy'),
