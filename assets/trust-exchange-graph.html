@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trust Exchange Railway Map</title>
+<script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
+<style>
+html, body{
+    margin:0;
+    width:100%;
+    height:100%;
+    overflow:hidden;
+    font-family:Inter, Arial, sans-serif;
+    background:
+    radial-gradient(
+        circle at center,
+        #1a2338 0%,
+        #0d1320 35%,
+        #05080f 70%,
+        #000000 100%
+    );
+}
+#cy{
+    width:100%;
+    height:100%;
+    position:absolute;
+}
+#glass{
+    position:absolute;
+    top:18px;
+    left:18px;
+    width:320px;
+    padding:18px;
+    z-index:999;
+    border-radius:18px;
+    color:white;
+    background:rgba(255,255,255,0.06);
+    border:1px solid rgba(255,255,255,0.08);
+    backdrop-filter:blur(16px);
+    box-shadow:0 0 30px rgba(0,0,0,0.35);
+}
+h1{
+    margin-top:0;
+    font-size:24px;
+}
+.legend{
+    margin-top:16px;
+}
+.item{
+    display:flex;
+    align-items:center;
+    margin-bottom:8px;
+}
+.dot{
+    width:14px;
+    height:14px;
+    border-radius:50%;
+    margin-right:10px;
+}
+</style>
+</head>
+<body>
+<div id="cy"></div>
+<div id="glass">
+  <h1>Trust Exchange</h1>
+  <div class="legend">
+    <div class="item"><div class="dot" style="background:#38bdf8"></div> Participant</div>
+    <div class="item"><div class="dot" style="background:#00ffa6"></div> Skill</div>
+    <div class="item"><div class="dot" style="background:#ffb347"></div> Trust</div>
+    <div class="item"><div class="dot" style="background:#ff4fa3"></div> Fairness</div>
+  </div>
+</div>
+<script>
+const cy = cytoscape({
+container: document.getElementById('cy'),
+elements:[
+// PARTICIPANTS
+{ data:{ id:'alex', label:'Alex', type:'participant' }, position:{ x:900, y:550 } },
+{ data:{ id:'maria', label:'Maria', type:'participant' }, position:{ x:1200, y:470 } },
+{ data:{ id:'daniel', label:'Daniel', type:'participant' }, position:{ x:1450, y:620 } },
+{ data:{ id:'jasmine', label:'Jasmine', type:'participant' }, position:{ x:1050, y:800 } },
+{ data:{ id:'kevin', label:'Kevin', type:'participant' }, position:{ x:1400, y:900 } },
+{ data:{ id:'lina', label:'Lina', type:'participant' }, position:{ x:1750, y:760 } },
+{ data:{ id:'marcus', label:'Marcus', type:'participant' }, position:{ x:1900, y:1020 } },
+{ data:{ id:'emily', label:'Emily', type:'participant' }, position:{ x:2100, y:620 } },
+{ data:{ id:'robert', label:'Robert', type:'participant' }, position:{ x:1700, y:340 } },
+{ data:{ id:'linda', label:'Linda', type:'participant' }, position:{ x:2250, y:900 } },
+// SKILLS
+{ data:{ id:'resume', label:'Resume Formatting', type:'skill' }, position:{ x:500, y:450 } },
+{ data:{ id:'calc', label:'Calc Study Help', type:'skill' }, position:{ x:450, y:650 } },
+{ data:{ id:'logos', label:'Logos', type:'skill' }, position:{ x:850, y:250 } },
+{ data:{ id:'branding', label:'Branding Advice', type:'skill' }, position:{ x:1100, y:180 } },
+{ data:{ id:'photography', label:'Photography', type:'skill' }, position:{ x:1350, y:150 } },
+{ data:{ id:'website', label:'Website Help', type:'skill' }, position:{ x:1600, y:170 } },
+{ data:{ id:'repair', label:'Computer Repair', type:'skill' }, position:{ x:1850, y:250 } },
+{ data:{ id:'wifi', label:'Wi-Fi Issues', type:'skill' }, position:{ x:2050, y:350 } },
+{ data:{ id:'home', label:'Home Repairs', type:'skill' }, position:{ x:2250, y:480 } },
+{ data:{ id:'homework', label:'Homework Help', type:'skill' }, position:{ x:700, y:1050 } },
+{ data:{ id:'notes', label:'Sharing Notes', type:'skill' }, position:{ x:900, y:1180 } },
+{ data:{ id:'bookkeeping', label:'Bookkeeping', type:'skill' }, position:{ x:1200, y:1220 } },
+{ data:{ id:'consulting', label:'Consulting', type:'skill' }, position:{ x:1450, y:1250 } },
+{ data:{ id:'marketing', label:'Marketing Advice', type:'skill' }, position:{ x:1700, y:1220 } },
+{ data:{ id:'photoshoots', label:'Photoshoots', type:'skill' }, position:{ x:1950, y:1180 } },
+{ data:{ id:'gym', label:'Gym Training', type:'skill' }, position:{ x:2250, y:1120 } },
+// TRUST
+{ data:{ id:'reviews', label:'Reviews', type:'trust' }, position:{ x:800, y:40 } },
+{ data:{ id:'verification', label:'Verification', type:'trust' }, position:{ x:1100, y:40 } },
+{ data:{ id:'portfolio', label:'Portfolio', type:'trust' }, position:{ x:1400, y:40 } },
+{ data:{ id:'communication', label:'Communication', type:'trust' }, position:{ x:1700, y:40 } },
+{ data:{ id:'reputation', label:'Reputation', type:'trust' }, position:{ x:2000, y:40 } },
+{ data:{ id:'trackrecord', label:'Track Record', type:'trust' }, position:{ x:2300, y:40 } },
+// FAIRNESS
+{ data:{ id:'effort', label:'Effort', type:'fairness' }, position:{ x:650, y:1450 } },
+{ data:{ id:'balanced', label:'Balanced', type:'fairness' }, position:{ x:950, y:1450 } },
+{ data:{ id:'agreement', label:'Agreement', type:'fairness' }, position:{ x:1250, y:1450 } },
+{ data:{ id:'worthit', label:'Worth It', type:'fairness' }, position:{ x:1550, y:1450 } },
+{ data:{ id:'consistency', label:'Consistency', type:'fairness' }, position:{ x:1850, y:1450 } },
+{ data:{ id:'expectations', label:'Expectations', type:'fairness' }, position:{ x:2150, y:1450 } },
+// EDGES
+{ data:{ source:'alex', target:'resume', line:'skill' }},
+{ data:{ source:'alex', target:'calc', line:'skill' }},
+{ data:{ source:'alex', target:'reviews', line:'trust' }},
+{ data:{ source:'alex', target:'effort', line:'fairness' }},
+{ data:{ source:'maria', target:'logos', line:'skill' }},
+{ data:{ source:'maria', target:'branding', line:'skill' }},
+{ data:{ source:'maria', target:'photography', line:'skill' }},
+{ data:{ source:'maria', target:'portfolio', line:'trust' }},
+{ data:{ source:'maria', target:'balanced', line:'fairness' }},
+{ data:{ source:'daniel', target:'repair', line:'skill' }},
+{ data:{ source:'daniel', target:'wifi', line:'skill' }},
+{ data:{ source:'daniel', target:'verification', line:'trust' }},
+{ data:{ source:'daniel', target:'agreement', line:'fairness' }},
+{ data:{ source:'jasmine', target:'homework', line:'skill' }},
+{ data:{ source:'jasmine', target:'notes', line:'skill' }},
+{ data:{ source:'jasmine', target:'worthit', line:'fairness' }},
+{ data:{ source:'kevin', target:'bookkeeping', line:'skill' }},
+{ data:{ source:'kevin', target:'consulting', line:'skill' }},
+{ data:{ source:'kevin', target:'marketing', line:'skill' }},
+{ data:{ source:'kevin', target:'trackrecord', line:'trust' }},
+{ data:{ source:'lina', target:'photoshoots', line:'skill' }},
+{ data:{ source:'lina', target:'communication', line:'trust' }},
+{ data:{ source:'lina', target:'expectations', line:'fairness' }},
+{ data:{ source:'marcus', target:'gym', line:'skill' }},
+{ data:{ source:'marcus', target:'consistency', line:'fairness' }},
+{ data:{ source:'emily', target:'reputation', line:'trust' }},
+{ data:{ source:'robert', target:'verification', line:'trust' }},
+{ data:{ source:'robert', target:'agreement', line:'fairness' }},
+{ data:{ source:'linda', target:'communication', line:'trust' }},
+{ data:{ source:'linda', target:'expectations', line:'fairness' }}
+],
+style:[
+{ selector:'node', style:{ 'label':'data(label)', 'font-size':11, 'text-wrap':'wrap', 'text-max-width':'100px', 'color':'white', 'text-outline-width':3, 'text-outline-color':'#000', 'text-valign':'center', 'text-halign':'center', 'border-width':2, 'border-color':'rgba(255,255,255,0.15)' } },
+{ selector:'node[type="participant"]', style:{ 'background-color':'#38bdf8', 'width':90, 'height':90, 'shadow-color':'#38bdf8', 'shadow-blur':40, 'shadow-opacity':1 } },
+{ selector:'node[type="skill"]', style:{ 'background-color':'#00ffa6', 'width':34, 'height':34, 'shadow-color':'#00ffa6', 'shadow-blur':18, 'shadow-opacity':0.8 } },
+{ selector:'node[type="trust"]', style:{ 'background-color':'#ffb347', 'width':42, 'height':42, 'shadow-color':'#ffb347', 'shadow-blur':25, 'shadow-opacity':0.9 } },
+{ selector:'node[type="fairness"]', style:{ 'background-color':'#ff4fa3', 'width':42, 'height':42, 'shadow-color':'#ff4fa3', 'shadow-blur':25, 'shadow-opacity':0.9 } },
+{ selector:'edge', style:{ 'curve-style':'segments', 'segment-distances':'40 -40 40', 'segment-weights':'0.2 0.5 0.8', 'width':5, 'opacity':0.85, 'line-cap':'round' } },
+{ selector:'edge[line="skill"]', style:{ 'line-color':'#00ffa6', 'shadow-color':'#00ffa6', 'shadow-blur':10, 'shadow-opacity':0.5 } },
+{ selector:'edge[line="trust"]', style:{ 'line-color':'#ffb347', 'shadow-color':'#ffb347', 'shadow-blur':10, 'shadow-opacity':0.5 } },
+{ selector:'edge[line="fairness"]', style:{ 'line-color':'#ff4fa3', 'shadow-color':'#ff4fa3', 'shadow-blur':10, 'shadow-opacity':0.5 } }
+],
+layout:{ name:'preset' }
+});
+
+// DIM/FOCUS STYLES
+cy.style().selector('.dim').style({ 'opacity': 0.08 }).update();
+cy.style().selector('.focus-node').style({ 'opacity': 1 }).update();
+cy.style().selector('.focus-edge').style({ 'opacity': 1 }).update();
+
+// FOCUS MODE
+cy.off('tap', 'node');
+cy.on('tap', 'node', function (evt) {
+  const start = evt.target;
+  cy.elements().removeClass('dim focus-node focus-edge');
+  cy.nodes().addClass('dim');
+  cy.edges().addClass('dim');
+  start.removeClass('dim');
+  start.addClass('focus-node');
+  const visited = new Set([start.id()]);
+  const queue = [start];
+  while (queue.length) {
+    const node = queue.shift();
+    node.connectedEdges().forEach(edge => {
+      const neighbors = edge.connectedNodes().filter(n => n.id() !== node.id());
+      neighbors.forEach(n => {
+        if (!visited.has(n.id())) {
+          visited.add(n.id());
+          queue.push(n);
+          n.removeClass('dim');
+          n.addClass('focus-node');
+          edge.removeClass('dim');
+          edge.addClass('focus-edge');
+        }
+      });
+    });
+  }
+});
+
+// BACKGROUND RESET
+cy.on('tap', function (e) {
+  if (e.target === cy) {
+    cy.elements().removeClass('dim focus-node focus-edge');
+  }
+});
+
+// HOVER GLOW
+cy.on('mouseover','node', function(evt){
+  evt.target.animate({ style:{ width:120, height:120 } },{ duration:200 });
+});
+cy.on('mouseout','node', function(evt){
+  let size = 42;
+  if(evt.target.data('type') === 'participant'){ size = 90; }
+  if(evt.target.data('type') === 'skill'){ size = 34; }
+  evt.target.animate({ style:{ width:size, height:size } },{ duration:200 });
+});
+
+// SLOW PULSE
+setInterval(()=>{
+  cy.nodes().forEach(node=>{
+    node.animate({ style:{ opacity:Math.random() * 0.25 + 0.75 } },{ duration:2000 });
+  });
+},2500);
+</script>
+</body>
+</html>
