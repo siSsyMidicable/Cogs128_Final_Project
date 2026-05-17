@@ -162,7 +162,7 @@ client/
 
 ---
 
-## 🔄 Git Guide — For Non-Technical Team Members
+## 🔄 Git Guide — For Non-Technical
 
 Not used to the terminal? This section explains everything you need to know to sync code with the team. No experience required.
 
