@@ -1,8 +1,8 @@
 # ────────────────────────────────────────────────────────────────
-# Cogs128 Final Project — CI Build
-# Node.js 24-ready • does NOT interfere with Pages deployment
+# Cogs128 Final Project — CI Build + GitHub Pages Deploy
+# Node.js 24-ready
 # ────────────────────────────────────────────────────────────────
-name: Build
+name: Build & Deploy
 
 on:
   push:
@@ -10,21 +10,26 @@ on:
   pull_request:
     branches: [main]
 
-# Each workflow gets its own concurrency group scoped by workflow file
-# + branch. Only runs from THIS workflow cancel each other on rapid
-# pushes. The Pages deployment workflow runs in a separate group and
-# is never touched by this one.
+# Separate concurrency groups so build and deploy never cancel each other
 concurrency:
   group: build-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Opt into Node.js 24 now so the June 2026 forced migration is a no-op
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+# Required for GitHub Pages deployment
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
+  # ──────────────────────────────────────────────────────────────
+  # JOB 1: Build, typecheck, and export web bundle
+  # ──────────────────────────────────────────────────────────────
   build:
-    name: Build & Test
+    name: Build & Export Web
     runs-on: ubuntu-latest
 
     steps:
@@ -45,21 +50,69 @@ jobs:
         working-directory: client
         run: npm ci
 
+      # ── Fix expo-router version for Expo 54 ────────────────────
+      - name: Fix expo-router version
+        working-directory: client
+        run: npx expo install expo-router
+        continue-on-error: true
+
       # ── TypeScript typecheck ───────────────────────────────────
       - name: TypeScript typecheck
         working-directory: client
         run: npx tsc --noEmit
         continue-on-error: true
 
-      # ── Server dependencies ────────────────────────────────────
-      - name: Install server dependencies
-        working-directory: server
-        run: npm ci
+      # ── Expo web export ────────────────────────────────────────
+      - name: Export web bundle
+        working-directory: client
+        run: npx expo export --platform web
+        env:
+          NODE_ENV: production
 
-      # ── Upload build artifacts ─────────────────────────────────
-      - name: Upload client artifacts
+      # ── Copy extra assets (graph, docs) into dist ──────────────
+      - name: Copy assets into dist
+        run: |
+          mkdir -p client/dist/assets
+          cp assets/trust-exchange-graph.html client/dist/trust-exchange-graph.html || true
+          cp assets/skillswap_3d_clean.html   client/dist/skillswap_3d_clean.html   || true
+
+      # ── Upload Pages artifact ──────────────────────────────────
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: client/dist
+
+      # ── Also upload client source for debugging ────────────────
+      - name: Upload client source artifact
         uses: actions/upload-artifact@v4
         with:
           name: client-build
           path: client/
           retention-days: 7
+
+      # ── Server dependencies ────────────────────────────────────
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+
+  # ──────────────────────────────────────────────────────────────
+  # JOB 2: Deploy to GitHub Pages (only on push to main)
+  # ──────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    concurrency:
+      group: pages-deploy-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
