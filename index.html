@@ -23,7 +23,6 @@ body {
   margin: 0 auto;
 }
 
-/* ── Header block ───────────────────────────────── */
 .header {
   padding-left: 44px;
   margin-bottom: 60px;
@@ -64,9 +63,6 @@ h1 {
   line-height: 1.7;
 }
 
-/* ── The vertical spine ─────────────────────────────────
-   One continuous rail the cards branch off from
-*/
 .rail {
   position: relative;
   width: 100%;
@@ -82,24 +78,21 @@ h1 {
   background: #1e293b;
 }
 
-/* ── Each station (card) ──────────────────────────────── */
 .station {
   position: relative;
   padding: 0 0 52px 0;
 }
 
-/* Branch line: horizontal tick from spine to card */
 .station::before {
   content: '';
   position: absolute;
   top: 10px;
-  left: 18px; /* spine x */
+  left: 18px;
   height: 2px;
   background: var(--rail-color);
   width: var(--branch-w);
 }
 
-/* Station dot on the spine */
 .station::after {
   content: '';
   position: absolute;
@@ -151,13 +144,11 @@ h1 {
 }
 .card-tag::before { content: '▶ '; }
 
-/* ── Per-station offsets — asymmetric, each one different ──────── */
 .s1 { --rail-color: #38bdf8; --branch-w: 52px;  --card-indent: 82px;  }
 .s2 { --rail-color: #00ffa6; --branch-w: 88px;  --card-indent: 118px; }
 .s3 { --rail-color: #ffb347; --branch-w: 38px;  --card-indent: 68px;  }
 .s4 { --rail-color: #ff4fa3; --branch-w: 70px;  --card-indent: 100px; }
 
-/* ── Team ───────────────────────────────────────── */
 .team {
   padding-left: 44px;
   position: relative;
@@ -187,15 +178,11 @@ h1 {
   line-height: 2;
 }
 
-.members span {
-  display: inline;
-}
 .members span + span::before {
   content: ' / ';
   color: #1e293b;
 }
 
-/* ── Responsive ──────────────────────────────────────── */
 @media (max-width: 600px) {
   .s1 { --branch-w: 30px; --card-indent: 58px; }
   .s2 { --branch-w: 44px; --card-indent: 72px; }
@@ -224,15 +211,15 @@ h1 {
   </div>
 
   <div class="station s2">
-    <a class="card" href="assets/skillswap_3d_clean.html">
+    <a class="card" href="assets/trust-exchange-graph.html">
       <div class="card-title">3D Match Visualization</div>
-      <div class="card-desc">Three-dimensional view of the SkillSwap matching model — skill nodes, trust vectors, and fairness weights rendered in space.</div>
+      <div class="card-desc">Three-dimensional view of the SkillSwap matching model — skill nodes, trust vectors, and fairness weights rendered as an interactive network graph.</div>
       <span class="card-tag">3D View</span>
     </a>
   </div>
 
   <div class="station s3">
-    <a class="card" href="docs/FINAL_REPORT.md">
+    <a class="card" href="docs/FINAL_REPORT.html">
       <div class="card-title">Final Report</div>
       <div class="card-desc">Complete 30-point rubric document covering proposal, interviews, personas, prototype analysis, user testing evaluation, and project management.</div>
       <span class="card-tag">30 pts</span>
