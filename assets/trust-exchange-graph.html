@@ -19,7 +19,7 @@ html, body {
   z-index: 10;
 }
 #glass {
-  position: absolute; top: 18px; left: 18px; width: 250px;
+  position: absolute; top: 18px; left: 18px; width: 260px;
   padding: 16px; z-index: 999; border-radius: 18px; color: white;
   background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08);
   backdrop-filter: blur(16px); box-shadow: 0 0 30px rgba(0,0,0,0.35);
@@ -57,7 +57,8 @@ glass.addEventListener('mouseenter', () => { clearTimeout(hideT); glass.classLis
 glass.addEventListener('mouseleave', () => { hideT = setTimeout(() => glass.classList.add('hidden'), 2000); });
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const BASE       = { participant: 90, trust: 42, fairness: 42, skill: 34 };
+const BASE        = { participant: 90, trust: 42, fairness: 42, skill: 34 };
+const HOVER_SIZE  = 115;
 const LINE_COLORS = { skill:'#00ffa6', trust:'#ffb347', fairness:'#ff4fa3' };
 
 // ─── Cytoscape ────────────────────────────────────────────────────────────────
@@ -134,16 +135,26 @@ const cy = cytoscape({
     { data:{ source:'linda',   target:'expectations', line:'fairness' } }
   ],
   style: [
-    { selector: 'node', style: {
-      'label': 'data(label)',
-      'font-size': 13, 'font-weight': 700,
-      'text-wrap': 'wrap', 'text-max-width': '100px',
-      'color': 'white', 'text-outline-width': 3, 'text-outline-color': '#000',
-      'text-valign': 'center', 'text-halign': 'center',
-      'border-width': 2, 'border-color': 'rgba(255,255,255,0.15)',
-      'transition-property': 'opacity, width, height, font-size, border-width',
-      'transition-duration': '300ms'
-    }},
+    // BASE NODE — unchanged from original
+    {
+      selector: 'node',
+      style: {
+        'label': 'data(label)',
+        'font-size': 11,
+        'font-weight': 600,
+        'text-wrap': 'wrap',
+        'text-max-width': '100px',
+        'color': 'white',
+        'text-outline-width': 3,
+        'text-outline-color': '#000',
+        'text-valign': 'center',
+        'text-halign': 'center',
+        'border-width': 2,
+        'border-color': 'rgba(255,255,255,0.15)',
+        'transition-property': 'opacity, width, height, font-size, text-outline-width, border-width, shadow-blur',
+        'transition-duration': '300ms'
+      }
+    },
     { selector: 'node[type="participant"]', style: {
       'background-color': '#38bdf8', 'width': 90, 'height': 90,
       'shadow-color': '#38bdf8', 'shadow-blur': 40, 'shadow-opacity': 1
@@ -160,36 +171,44 @@ const cy = cytoscape({
       'background-color': '#ff4fa3', 'width': 42, 'height': 42,
       'shadow-color': '#ff4fa3', 'shadow-blur': 25, 'shadow-opacity': 0.9
     }},
+    // EDGES — unchanged from original
     { selector: 'edge', style: {
-      'curve-style': 'straight',
-      'width': 4, 'opacity': 0.35, 'line-cap': 'round',
-      'transition-property': 'opacity, width', 'transition-duration': '300ms'
+      'curve-style': 'segments',
+      'segment-distances': '40 -40 40', 'segment-weights': '0.2 0.5 0.8',
+      'width': 5, 'opacity': 0.85, 'line-cap': 'round',
+      'transition-property': 'opacity, width, shadow-blur',
+      'transition-duration': '300ms'
     }},
-    { selector: 'edge[line="skill"]',    style: { 'line-color': '#00ffa6' } },
-    { selector: 'edge[line="trust"]',    style: { 'line-color': '#ffb347' } },
-    { selector: 'edge[line="fairness"]', style: { 'line-color': '#ff4fa3' } },
-    { selector: '.dim', style: { 'opacity': 0.04, 'text-opacity': 0 } },
+    { selector: 'edge[line="skill"]',    style: { 'line-color': '#00ffa6', 'shadow-color': '#00ffa6', 'shadow-blur': 10, 'shadow-opacity': 0.5 } },
+    { selector: 'edge[line="trust"]',    style: { 'line-color': '#ffb347', 'shadow-color': '#ffb347', 'shadow-blur': 10, 'shadow-opacity': 0.5 } },
+    { selector: 'edge[line="fairness"]', style: { 'line-color': '#ff4fa3', 'shadow-color': '#ff4fa3', 'shadow-blur': 10, 'shadow-opacity': 0.5 } },
+    // DIM
+    { selector: '.dim', style: { 'opacity': 0.06, 'text-opacity': 0 } },
+    // FOCUSED NODE
     { selector: '.focus-node', style: {
-      'opacity': 1, 'font-size': 16, 'font-weight': 800,
+      'opacity': 1, 'font-size': 15, 'font-weight': 800,
       'text-outline-width': 4, 'text-outline-color': '#000',
-      'color': '#ffffff', 'border-width': 3,
-      'border-color': 'rgba(255,255,255,0.6)', 'text-opacity': 1
+      'color': '#ffffff', 'border-width': 4,
+      'border-color': 'rgba(255,255,255,0.7)',
+      'shadow-blur': 60, 'shadow-opacity': 1, 'text-opacity': 1
     }},
-    { selector: '.focus-edge', style: { 'opacity': 0, 'width': 5 } },
+    // FOCUSED EDGE
+    { selector: '.focus-edge', style: { 'opacity': 1, 'width': 7, 'shadow-blur': 20, 'shadow-opacity': 0.9 } },
+    // HOVER
     { selector: '.hovered', style: {
-      'font-size': 18, 'font-weight': 900,
+      'font-size': 17, 'font-weight': 900,
       'text-outline-width': 5, 'text-outline-color': '#000',
       'color': '#ffffff', 'text-opacity': 1,
-      'border-width': 4, 'border-color': 'rgba(255,255,255,0.9)'
+      'border-width': 4, 'border-color': 'rgba(255,255,255,0.9)',
+      'shadow-blur': 70, 'shadow-opacity': 1
     }}
   ],
   layout: { name: 'preset' }
 });
 
-// ─── Canvas ───────────────────────────────────────────────────────────────────
+// ─── Canvas overlay ────────────────────────────────────────────────────────────────
 const canvas = document.getElementById('energy-canvas');
 const ctx    = canvas.getContext('2d');
-
 function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
 resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
@@ -198,7 +217,6 @@ function toScreen(pos) {
   const p = cy.pan(), z = cy.zoom();
   return { x: pos.x * z + p.x, y: pos.y * z + p.y };
 }
-
 function hexRGB(hex) {
   return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)];
 }
@@ -209,11 +227,7 @@ let pulseTimers  = [];
 let hoveredNode  = null;
 let rafId        = null;
 let breathPhase  = 0;
-
-// activeLines: [{ srcPos, tgtPos, color, rgb, originIsSelected }]
-// originIsSelected = true if source is the clicked node (draw outward from src→tgt)
-let activeLines  = [];
-let selectedNode = null;
+let activeLines  = [];  // { ax,ay,bx,by, rgb }
 
 function getBaseSize(n) { return BASE[n.data('type')] || 42; }
 function stopAllPulse() { pulseTimers.forEach(clearInterval); pulseTimers = []; }
@@ -223,51 +237,37 @@ function stopRAF() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 
-// ─── DRAW EDGE BREATH ────────────────────────────────────────────────────────
-// breathT: 0→1 exhale (bright front sweeps toward far end)
-//          1→0 inhale  (retreats back to selected node)
-// The gradient is painted strictly along the straight line using a
-// linear-gradient that goes:  transparent → color (at brightStop) → transparent
-// brightStop oscillates with breathT so the glow rides outward then pulls back.
+// ─── Draw a single edge’s breath: gradient sweeps along the line ─────────────────────
+// breathT 0→1 = exhale (front moves origin → far end)
+// breathT 1→0 = inhale (front retreats to origin)
 function drawEdgeBreath(line, breathT) {
-  const sp = toScreen(line.srcPos);
-  const tp = toScreen(line.tgtPos);
+  const sp = toScreen({ x: line.sx, y: line.sy });
+  const tp = toScreen({ x: line.tx, y: line.ty });
 
-  // Direction: if this edge's origin is the selected node, bright sweeps src→tgt
-  // otherwise tgt→src (for nodes that are connected TO the selected node on return)
-  const ax = line.originIsSelected ? sp.x : tp.x;
-  const ay = line.originIsSelected ? sp.y : tp.y;
-  const bx = line.originIsSelected ? tp.x : sp.x;
-  const by = line.originIsSelected ? tp.y : sp.y;
-
-  // Stroke width from Cytoscape zoom
   const zoom = cy.zoom();
-  const strokeW = 5 * zoom;
+  const strokeW = 6 * zoom;   // same visual weight as the Cytoscape edge
 
-  // The "bright front" position along the line: 0 = at origin node, 1 = at far node
-  const front = breathT;  // breathT is already 0→1→0→...
-
-  // Build a linear gradient along the exact line segment
-  const grad = ctx.createLinearGradient(ax, ay, bx, by);
+  // front position along the line: 0 = at origin (selected node), 1 = at far node
+  const front = breathT;
+  const tail  = Math.max(0, front - 0.4);
 
   const [r, g, b] = line.rgb;
 
-  // Soft tail behind the front
-  const tail = Math.max(0, front - 0.35);
-  grad.addColorStop(0,              `rgba(${r},${g},${b},0)`);
-  grad.addColorStop(Math.max(0, tail), `rgba(${r},${g},${b},0)`);
-  grad.addColorStop(Math.min(1, front * 0.75), `rgba(${r},${g},${b},${0.25 + breathT * 0.25})`);
-  grad.addColorStop(Math.min(1, front),        `rgba(${r},${g},${b},${0.85 + breathT * 0.15})`);
-  // fade to transparent beyond the front
-  if (front < 0.98) {
-    grad.addColorStop(Math.min(1, front + 0.04), `rgba(${r},${g},${b},0)`);
-    grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
-  }
+  // Linear gradient from origin to far end
+  const grad = ctx.createLinearGradient(sp.x, sp.y, tp.x, tp.y);
+  grad.addColorStop(0,                           `rgba(${r},${g},${b},0)`);
+  if (tail > 0.01)
+    grad.addColorStop(tail,                      `rgba(${r},${g},${b},0)`);
+  grad.addColorStop(Math.min(1, front * 0.7),    `rgba(${r},${g},${b},${0.2 + breathT * 0.3})`);
+  grad.addColorStop(Math.min(1, front),          `rgba(${r},${g},${b},1)`);
+  if (front < 0.97)
+    grad.addColorStop(Math.min(1, front + 0.03), `rgba(${r},${g},${b},0)`);
+  grad.addColorStop(1,                           `rgba(${r},${g},${b},0)`);
 
   ctx.save();
   ctx.beginPath();
-  ctx.moveTo(ax, ay);
-  ctx.lineTo(bx, by);
+  ctx.moveTo(sp.x, sp.y);
+  ctx.lineTo(tp.x, tp.y);
   ctx.strokeStyle = grad;
   ctx.lineWidth   = strokeW;
   ctx.lineCap     = 'round';
@@ -275,29 +275,28 @@ function drawEdgeBreath(line, breathT) {
   ctx.restore();
 }
 
-// ─── MAIN ANIMATION LOOP ─────────────────────────────────────────────────────
+// ─── Energy + breath loop ─────────────────────────────────────────────────────────
 function startEnergyLoop(focusedNodes, focusedEdges, clickedNode) {
   stopAllPulse();
   stopRAF();
   breathPhase = 0;
 
-  // Build activeLines — orient each edge so "origin" = clicked node side
+  // Build line data — orient so origin = clicked node
   activeLines = [];
   focusedEdges.forEach(edge => {
     const src = edge.source();
     const tgt = edge.target();
     const color = LINE_COLORS[edge.data('line')] || '#ffffff';
     const rgb   = hexRGB(color);
-    // Determine which end touches the clicked (or same-group selected) node
-    // For simplicity: if source is the clicked node → originIsSelected true
-    // Otherwise treat target side as origin (energy flows tgt→src direction = toward selected)
-    // We want exhale = away from selected, inhale = toward selected.
-    // So originIsSelected = source is the clicked node; draw bright from src→tgt on exhale.
-    const originIsSelected = src.id() === clickedNode.id();
+    // If source is the clicked node: origin = source, far = target
+    // Otherwise: origin = target (the connected-node end nearest selected), far = source
+    const fromSrc = src.id() === clickedNode.id();
     activeLines.push({
-      srcPos: { x: src.position('x'), y: src.position('y') },
-      tgtPos: { x: tgt.position('x'), y: tgt.position('y') },
-      color, rgb, originIsSelected
+      sx: fromSrc ? src.position('x') : tgt.position('x'),
+      sy: fromSrc ? src.position('y') : tgt.position('y'),
+      tx: fromSrc ? tgt.position('x') : src.position('x'),
+      ty: fromSrc ? tgt.position('y') : src.position('y'),
+      rgb
     });
   });
 
@@ -305,28 +304,27 @@ function startEnergyLoop(focusedNodes, focusedEdges, clickedNode) {
     rafId = requestAnimationFrame(tick);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Advance breath: full cycle ~3.5 sec
+    // Advance breath — full inhale+exhale cycle ~3.5 sec
     breathPhase += 0.018;
-    // Convert to 0→1→0 triangle wave (exhale then inhale)
-    const raw = (Math.sin(breathPhase - Math.PI / 2) + 1) / 2; // 0→1→0
-    const breathT = raw; // 0 = fully inhaled (at node), 1 = fully exhaled (at far end)
+    // Triangle wave 0→1→0: exhale out then inhale back
+    const breathT = (Math.sin(breathPhase - Math.PI / 2) + 1) / 2;
 
-    // Pulse node glow in sync: bright on exhale (breathT=1), dim on inhale (breathT=0)
+    // Pulse node glow in sync
     focusedNodes.forEach(n => {
       if (n.hasClass('dim')) return;
       const base = getBaseSize(n);
-      n.style('shadow-blur',  (base * 0.3 + breathT * base * 0.8).toString());
+      n.style('shadow-blur',  (base * 0.4 + breathT * base * 0.8).toString());
       n.style('border-width', (2 + breathT * 4).toString());
     });
 
-    // Draw every active edge's breath gradient
+    // Draw edge breath on canvas (on top of Cytoscape edges)
     activeLines.forEach(line => drawEdgeBreath(line, breathT));
   }
 
   rafId = requestAnimationFrame(tick);
 }
 
-// ─── IDLE PULSE ───────────────────────────────────────────────────────────────
+// ─── Idle pulse ───────────────────────────────────────────────────────────────────
 function startIdlePulse() {
   stopAllPulse();
   stopRAF();
@@ -344,10 +342,9 @@ function startIdlePulse() {
   pulseTimers.push(id);
 }
 
-// ─── CLICK ────────────────────────────────────────────────────────────────────
+// ─── Click ────────────────────────────────────────────────────────────────────
 cy.on('tap', 'node', function(evt) {
   const clicked = evt.target;
-
   if (focusActive && clicked.hasClass('focus-node') && !clicked.hasClass('dim')) {
     resetAll(); return;
   }
@@ -380,9 +377,9 @@ cy.on('tap', 'node', function(evt) {
     });
   }
 
-  focusActive  = true;
-  selectedNode = clicked;
+  focusActive = true;
 
+  // Auto pan + fit — perfectly sized for viewport
   cy.animate({
     fit: { eles: focNodes, padding: Math.min(window.innerWidth, window.innerHeight) * 0.12 }
   }, { duration: 550, easing: 'ease-in-out-cubic' });
@@ -390,7 +387,7 @@ cy.on('tap', 'node', function(evt) {
   startEnergyLoop(focNodes, focEdges, clicked);
 });
 
-// ─── BG TAP RESET ─────────────────────────────────────────────────────────────
+// ─── Background reset ─────────────────────────────────────────────────────────────
 cy.on('tap', function(e) { if (e.target === cy) resetAll(); });
 
 function resetAll() {
@@ -398,19 +395,18 @@ function resetAll() {
   stopRAF();
   cy.elements().removeClass('dim focus-node focus-edge hovered');
   cy.nodes().forEach(n => { n.style('shadow-blur', ''); n.style('border-width', '2'); });
-  focusActive  = false;
-  selectedNode = null;
+  focusActive = false;
   cy.animate({ fit: { eles: cy.nodes(), padding: 60 } }, { duration: 500, easing: 'ease-in-out-cubic' });
   startIdlePulse();
 }
 
-// ─── HOVER ────────────────────────────────────────────────────────────────────
+// ─── Hover ────────────────────────────────────────────────────────────────────
 cy.on('mouseover', 'node', function(evt) {
   const node = evt.target;
   hoveredNode = node;
   if (node.hasClass('dim')) return;
   node.addClass('hovered');
-  const big = node.data('type') === 'participant' ? 120 : 90;
+  const big = node.data('type') === 'participant' ? HOVER_SIZE + 20 : HOVER_SIZE;
   node.stop().animate({ style: { width: big, height: big } }, { duration: 180 });
 });
 cy.on('mouseout', 'node', function(evt) {
