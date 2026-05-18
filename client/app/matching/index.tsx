@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  Pressable, StatusBar, Modal,
+  Pressable, StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
@@ -75,6 +75,9 @@ function UserCard({ user, onView }: { user: CardUser; onView: () => void }) {
     : alreadySent    ? '📨 Requested'
     : null;
 
+  // tagline: "Offers: X · Y · Z"
+  const tagline = `Offers: ${(user.offers ?? []).slice(0, 3).join(' · ')}`;
+
   return (
     <View style={uc.outer}>
       <View style={uc.glowOne} />
@@ -92,21 +95,21 @@ function UserCard({ user, onView }: { user: CardUser; onView: () => void }) {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={uc.name}>{user.name}</Text>
-            <Text style={uc.tagline} numberOfLines={1}>{user.tagline}</Text>
+            <Text style={uc.tagline} numberOfLines={1}>{tagline}</Text>
           </View>
           <ScoreRing score={score.total} />
         </View>
 
-        {/* Skill chips */}
+        {/* Skill chips — from user.offers */}
         <View style={uc.chipRow}>
-          {user.skills.slice(0, 3).map(sk => (
+          {(user.offers ?? []).slice(0, 3).map(sk => (
             <View key={sk} style={uc.chip}>
               <Text style={uc.chipTxt}>{sk}</Text>
             </View>
           ))}
-          {user.skills.length > 3 && (
+          {(user.offers ?? []).length > 3 && (
             <View style={uc.chip}>
-              <Text style={uc.chipTxt}>+{user.skills.length - 3}</Text>
+              <Text style={uc.chipTxt}>+{user.offers.length - 3}</Text>
             </View>
           )}
         </View>
@@ -166,7 +169,6 @@ const uc = StyleSheet.create({
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export default function MatchingScreen() {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const others = MOCK_USERS.filter(u => u.id !== YOU.id);
 
   return (
