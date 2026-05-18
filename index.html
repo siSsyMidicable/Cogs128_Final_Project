@@ -6,76 +6,190 @@
 <title>SkillSwap — COGS 128 Final Project</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
 html, body {
-  height: 100%; font-family: Inter, system-ui, sans-serif;
-  background: radial-gradient(circle at 30% 20%, #1a2338 0%, #0d1320 40%, #05080f 80%, #000 100%);
-  color: #e2e8f0; min-height: 100vh;
+  height: 100%;
+  font-family: 'JetBrains Mono', 'Fira Mono', 'Courier New', monospace;
+  background: #05080f;
+  color: #c9d1de;
+  min-height: 100vh;
 }
-body { display: flex; flex-direction: column; align-items: center; padding: 48px 24px 80px; }
 
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 56px 28px 100px;
+}
+
+/* ── Badge ──────────────────────────────────────── */
 .badge {
-  font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
-  color: #38bdf8; border: 1px solid #38bdf844; border-radius: 999px;
-  padding: 4px 14px; margin-bottom: 28px;
-  background: rgba(56,189,248,0.07);
-}
-h1 {
-  font-size: clamp(2rem, 6vw, 3.8rem); font-weight: 900; text-align: center;
-  line-height: 1.1; letter-spacing: -0.02em;
-  background: linear-gradient(135deg, #e2e8f0 30%, #38bdf8 70%);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  background-clip: text; margin-bottom: 16px;
-}
-.sub {
-  font-size: clamp(0.95rem, 2vw, 1.15rem); color: #94a3b8;
-  text-align: center; max-width: 520px; line-height: 1.6; margin-bottom: 56px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #38bdf8;
+  border: 1px solid #38bdf8;
+  padding: 4px 12px;
+  margin-bottom: 36px;
 }
 
+/* ── Title ──────────────────────────────────────── */
+h1 {
+  font-size: clamp(2.2rem, 6vw, 4rem);
+  font-weight: 900;
+  text-align: center;
+  line-height: 1.0;
+  letter-spacing: -0.03em;
+  color: #e2e8f0;
+  margin-bottom: 20px;
+}
+
+/* Ruled line under title — like a rail */
+h1::after {
+  content: '';
+  display: block;
+  margin: 14px auto 0;
+  width: 60px;
+  height: 3px;
+  background: #38bdf8;
+}
+
+.sub {
+  font-family: Inter, system-ui, sans-serif;
+  font-size: clamp(0.88rem, 2vw, 1.05rem);
+  color: #64748b;
+  text-align: center;
+  max-width: 500px;
+  line-height: 1.7;
+  margin-bottom: 64px;
+  margin-top: 18px;
+}
+
+/* ── Grid ──────────────────────────────────────── */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 20px; width: 100%; max-width: 900px;
-  margin-bottom: 56px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0;
+  width: 100%;
+  max-width: 920px;
+  margin-bottom: 64px;
+  border: 1px solid #1e293b;
 }
-.card {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 20px; padding: 28px;
-  text-decoration: none; color: inherit;
-  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
-  display: flex; flex-direction: column; gap: 10px;
-}
-.card:hover {
-  transform: translateY(-4px);
-  border-color: rgba(56,189,248,0.4);
-  background: rgba(56,189,248,0.06);
-}
-.card-icon { font-size: 2rem; }
-.card-title { font-size: 1.1rem; font-weight: 800; color: #f1f5f9; }
-.card-desc  { font-size: 0.88rem; color: #94a3b8; line-height: 1.55; }
-.card-tag {
-  display: inline-block; margin-top: 4px;
-  font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
-  padding: 3px 10px; border-radius: 999px;
-}
-.tag-blue   { background: rgba(56,189,248,0.15);  color: #38bdf8; }
-.tag-green  { background: rgba(0,255,166,0.12);   color: #00ffa6; }
-.tag-orange { background: rgba(255,179,71,0.15);  color: #ffb347; }
-.tag-pink   { background: rgba(255,79,163,0.15);  color: #ff4fa3; }
 
+/* ── Cards ─────────────────────────────────────── */
+.card {
+  background: #080c14;
+  border-right: 1px solid #1e293b;
+  border-bottom: 1px solid #1e293b;
+  padding: 28px 24px 24px;
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  transition: background 0.15s ease;
+}
+
+/* Left rail accent — color per card type */
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--rail);
+  opacity: 0.9;
+}
+
+.card:hover {
+  background: #0d1525;
+}
+
+.card:hover::before {
+  opacity: 1;
+}
+
+.card-blue  { --rail: #38bdf8; }
+.card-green { --rail: #00ffa6; }
+.card-orange{ --rail: #ffb347; }
+.card-pink  { --rail: #ff4fa3; }
+
+.card-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.card-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.card-desc {
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 0.83rem;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.card-tag {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border: 1px solid currentColor;
+  width: fit-content;
+}
+
+.tag-blue   { color: #38bdf8; }
+.tag-green  { color: #00ffa6; }
+.tag-orange { color: #ffb347; }
+.tag-pink   { color: #ff4fa3; }
+
+/* ── Team ──────────────────────────────────────── */
 .team {
-  max-width: 900px; width: 100%;
-  border-top: 1px solid rgba(255,255,255,0.07);
-  padding-top: 36px; text-align: center;
+  max-width: 920px;
+  width: 100%;
+  border-top: 1px solid #1e293b;
+  padding-top: 32px;
+  text-align: left;
 }
-.team h2 { font-size: 0.8rem; letter-spacing: 0.1em; text-transform: uppercase; color: #475569; margin-bottom: 14px; }
+
+.team h2 {
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #334155;
+  margin-bottom: 18px;
+}
+
 .members {
-  display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
 }
+
 .member {
-  font-size: 0.85rem; color: #94a3b8;
-  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
-  border-radius: 999px; padding: 5px 16px;
+  font-size: 0.8rem;
+  color: #475569;
+  border: 1px solid #1e293b;
+  border-left: 3px solid #1e293b;
+  padding: 6px 14px;
+  margin: 0 8px 8px 0;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.member:hover {
+  color: #94a3b8;
+  border-color: #334155;
 }
 </style>
 </head>
@@ -88,28 +202,28 @@ h1 {
 
 <div class="grid">
 
-  <a class="card" href="assets/trust-exchange-graph.html">
+  <a class="card card-blue" href="assets/trust-exchange-graph.html">
     <div class="card-icon">🕸️</div>
     <div class="card-title">Trust Exchange Map</div>
     <div class="card-desc">Interactive network graph — click any node to focus its connections. Watch energy breathe outward along each edge and pull back in sync.</div>
     <span class="card-tag tag-blue">Interactive</span>
   </a>
 
-  <a class="card" href="assets/skillswap_3d_clean.html">
+  <a class="card card-green" href="assets/skillswap_3d_clean.html">
     <div class="card-icon">🌐</div>
     <div class="card-title">3D Match Visualization</div>
     <div class="card-desc">Three-dimensional view of the SkillSwap matching model — skill nodes, trust vectors, and fairness weights rendered in space.</div>
     <span class="card-tag tag-green">3D View</span>
   </a>
 
-  <a class="card" href="docs/FINAL_REPORT.md">
+  <a class="card card-orange" href="docs/FINAL_REPORT.md">
     <div class="card-icon">📄</div>
     <div class="card-title">Final Report</div>
     <div class="card-desc">Complete 30-point rubric document covering proposal, interviews, personas, prototype analysis, user testing evaluation, and project management.</div>
     <span class="card-tag tag-orange">30 pts</span>
   </a>
 
-  <a class="card" href="https://github.com/siSsyMidicable/Cogs128_Final_Project" target="_blank" rel="noopener">
+  <a class="card card-pink" href="https://github.com/siSsyMidicable/Cogs128_Final_Project" target="_blank" rel="noopener">
     <div class="card-icon">💻</div>
     <div class="card-title">GitHub Repository</div>
     <div class="card-desc">Full source code — React Native / Expo client, matching engine, server, interview data, and all project documentation.</div>
