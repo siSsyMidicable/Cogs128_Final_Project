@@ -1,7 +1,7 @@
 # SkillSwap — COGS 128 Final Project Report
 **UC Merced · Cognitive Engineering · Spring 2026**
 
-**Group Members:** Eduardo Leyva · James Burlinson · Yongva Sean Yang · Shabach Karathi · Nachturia Rhetorica
+**Group Members:** Eduardo Leyva · James Burlinson · Yongva Sean Yang · Shabach Karathi · Nachtoria Rhetorica
 
 ---
 
@@ -96,7 +96,7 @@ Five personas were developed, one per group member. Each is based directly on in
 ---
 
 ### Persona 1 — Maria
-**Contributor:** Nachturia Rhetorica
+**Contributor:** Nachtoria Rhetorica
 
 | Attribute | Detail |
 |---|---|
@@ -111,7 +111,7 @@ Five personas were developed, one per group member. Each is based directly on in
 
 **Background:** Maria is a 28-year-old freelance graphic designer who leaned heavily on informal skill trading early in her career when paying clients were scarce. She exchanged logos and social media designs for photography, website help, and branding advice — trades that helped her build her business from the ground up. She requires legitimacy: a visible portfolio is non-negotiable, and slow or vague communication is an immediate red flag. Her fairness metric is time-based — she measures trades in hours of effort and expects rough parity.
 
-**Interviewers who contributed:** Nachturia Rhetorica (primary), Yongva Sean Yang
+**Interviewers who contributed:** Nachtoria Rhetorica (primary), Yongva Sean Yang
 
 ---
 
@@ -151,7 +151,7 @@ Five personas were developed, one per group member. Each is based directly on in
 
 **Background:** Daniel is a 35-year-old IT support specialist who regularly trades technical skills for practical help. He approaches digital platforms with a verification-first mindset: anonymous profiles are a non-starter. He wants identity accountability built into the system before he commits to any exchange, and he sets expectations explicitly upfront to avoid disagreements.
 
-**Interviewers who contributed:** Shabach Karathi (primary), Nachturia Rhetorica
+**Interviewers who contributed:** Shabach Karathi (primary), Nachtoria Rhetorica
 
 ---
 
@@ -191,7 +191,7 @@ Five personas were developed, one per group member. Each is based directly on in
 
 **Background:** Robert is a retired electrician with deep roots in community-based skill exchange. He has spent decades in informal barter systems built on mutual trust and personal relationships. While open to a digital platform, he prioritizes verification, local proximity, and transparent agreements. He represents a trust-first archetype: the concept is familiar, but digital anonymity is the barrier.
 
-**Interviewers who contributed:** Eduardo Leyva (primary), Nachturia Rhetorica
+**Interviewers who contributed:** Eduardo Leyva (primary), Nachtoria Rhetorica
 
 ---
 
@@ -294,7 +294,7 @@ Both changes illustrate the core value of formative evaluation: they corrected a
 
 ## 6. Project Manager Report
 
-**Project Manager:** Nachturia Rhetorica
+**Project Manager:** Nachtoria Rhetorica
 
 ### Project Timeline
 
@@ -342,7 +342,7 @@ The largest cost driver is engineering labor. The math engine and matching logic
 
 All five rubric deliverables were completed on schedule. The prototype is fully functional and deployed to GitHub Pages. The matching engine, interview data, personas, and evaluation report are all in the repository and linked from the README.
 
-The primary deviation from the original plan was in the user testing section: the group member assigned to conduct user testing was unable to access the prototype and did not communicate this until the deadline was near. The prototype lead (Nachturia Rhetorica) completed the evaluation independently using heuristic inspection, which is a valid and methodologically sound alternative per Sharp et al. Ch. 14.
+The primary deviation from the original plan was in the user testing section: the group member assigned to conduct user testing was unable to access the prototype and did not communicate this until the deadline was near. The prototype lead (Nachtoria Rhetorica) completed the evaluation independently using heuristic inspection, which is a valid and methodologically sound alternative per Sharp et al. Ch. 14.
 
 ### What We Would Do Better
 
@@ -352,5 +352,5 @@ From a management perspective, the lesson is that **process is not overhead, it 
 
 ---
 
-*Submitted Srping, 2026 · COGS 128 · UC Merced*
-*Prototype Lead & Project Manager: Nachturia Rhetorica (GitHub: [@siSsyMidicable](https://github.com/siSsyMidicable))*
+*Submitted Spring 2026 · COGS 128 · UC Merced*
+*Prototype Lead & Project Manager: Nachtoria Rhetorica (GitHub: [@siSsyMidicable](https://github.com/siSsyMidicable))*
