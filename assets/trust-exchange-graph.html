@@ -11,9 +11,16 @@ html, body {
   font-family: Inter, Arial, sans-serif;
   background: radial-gradient(circle at center, #1a2338 0%, #0d1320 35%, #05080f 70%, #000 100%);
 }
-#cy { width: 100%; height: 100%; position: absolute; }
+#cy { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
+/* Canvas sits on top of cy but pointer-events:none so clicks pass through */
+#energy-canvas {
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 10;
+}
 #glass {
-  position: absolute; top: 18px; left: 18px; width: 260px;
+  position: absolute; top: 18px; left: 18px; width: 250px;
   padding: 16px; z-index: 999; border-radius: 18px; color: white;
   background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08);
   backdrop-filter: blur(16px); box-shadow: 0 0 30px rgba(0,0,0,0.35);
@@ -30,6 +37,7 @@ h1 { margin-top: 0; font-size: 20px; font-weight: 800; letter-spacing: 0.02em; }
 <body>
 
 <div id="cy"></div>
+<canvas id="energy-canvas"></canvas>
 
 <div id="glass">
   <h1>Trust Exchange</h1>
@@ -43,24 +51,21 @@ h1 { margin-top: 0; font-size: 20px; font-weight: 800; letter-spacing: 0.02em; }
 </div>
 
 <script>
-// ─── Legend auto-hide ────────────────────────────────────────────
+// ─── Legend ───────────────────────────────────────────────────────────────────
 const glass = document.getElementById('glass');
-showGlass();
-let hideT = setTimeout(hideGlass, 3500);
-function hideGlass(){ glass.classList.add('hidden'); }
-function showGlass(){ glass.classList.remove('hidden'); }
-glass.addEventListener('mouseenter', () => { clearTimeout(hideT); showGlass(); });
-glass.addEventListener('mouseleave', () => { hideT = setTimeout(hideGlass, 2000); });
+let hideT = setTimeout(() => glass.classList.add('hidden'), 3500);
+glass.addEventListener('mouseenter', () => { clearTimeout(hideT); glass.classList.remove('hidden'); });
+glass.addEventListener('mouseleave', () => { hideT = setTimeout(() => glass.classList.add('hidden'), 2000); });
 
-// ─── Node base sizes ─────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 const BASE = { participant: 90, trust: 42, fairness: 42, skill: 34 };
-const HOVER_SIZE = 115;
+const COLORS = { participant:'#38bdf8', skill:'#00ffa6', trust:'#ffb347', fairness:'#ff4fa3' };
+const LINE_COLORS = { skill:'#00ffa6', trust:'#ffb347', fairness:'#ff4fa3' };
 
-// ─── Cytoscape ───────────────────────────────────────────────────
+// ─── Cytoscape ────────────────────────────────────────────────────────────────
 const cy = cytoscape({
   container: document.getElementById('cy'),
   elements: [
-    // PARTICIPANTS
     { data:{ id:'alex',    label:'Alex',    type:'participant' }, position:{ x:900,  y:550  } },
     { data:{ id:'maria',   label:'Maria',   type:'participant' }, position:{ x:1200, y:470  } },
     { data:{ id:'daniel',  label:'Daniel',  type:'participant' }, position:{ x:1450, y:620  } },
@@ -71,7 +76,6 @@ const cy = cytoscape({
     { data:{ id:'emily',   label:'Emily',   type:'participant' }, position:{ x:2100, y:620  } },
     { data:{ id:'robert',  label:'Robert',  type:'participant' }, position:{ x:1700, y:340  } },
     { data:{ id:'linda',   label:'Linda',   type:'participant' }, position:{ x:2250, y:900  } },
-    // SKILLS
     { data:{ id:'resume',      label:'Resume Formatting', type:'skill' }, position:{ x:500,  y:450  } },
     { data:{ id:'calc',        label:'Calc Study Help',   type:'skill' }, position:{ x:450,  y:650  } },
     { data:{ id:'logos',       label:'Logos',             type:'skill' }, position:{ x:850,  y:250  } },
@@ -88,208 +92,276 @@ const cy = cytoscape({
     { data:{ id:'marketing',   label:'Marketing Advice',  type:'skill' }, position:{ x:1700, y:1220 } },
     { data:{ id:'photoshoots', label:'Photoshoots',       type:'skill' }, position:{ x:1950, y:1180 } },
     { data:{ id:'gym',         label:'Gym Training',      type:'skill' }, position:{ x:2250, y:1120 } },
-    // TRUST
     { data:{ id:'reviews',       label:'Reviews',       type:'trust' }, position:{ x:800,  y:40 } },
     { data:{ id:'verification',  label:'Verification',  type:'trust' }, position:{ x:1100, y:40 } },
     { data:{ id:'portfolio',     label:'Portfolio',     type:'trust' }, position:{ x:1400, y:40 } },
     { data:{ id:'communication', label:'Communication', type:'trust' }, position:{ x:1700, y:40 } },
     { data:{ id:'reputation',    label:'Reputation',    type:'trust' }, position:{ x:2000, y:40 } },
     { data:{ id:'trackrecord',   label:'Track Record',  type:'trust' }, position:{ x:2300, y:40 } },
-    // FAIRNESS
     { data:{ id:'effort',       label:'Effort',       type:'fairness' }, position:{ x:650,  y:1450 } },
     { data:{ id:'balanced',     label:'Balanced',     type:'fairness' }, position:{ x:950,  y:1450 } },
     { data:{ id:'agreement',    label:'Agreement',    type:'fairness' }, position:{ x:1250, y:1450 } },
     { data:{ id:'worthit',      label:'Worth It',     type:'fairness' }, position:{ x:1550, y:1450 } },
     { data:{ id:'consistency',  label:'Consistency',  type:'fairness' }, position:{ x:1850, y:1450 } },
     { data:{ id:'expectations', label:'Expectations', type:'fairness' }, position:{ x:2150, y:1450 } },
-    // EDGES
-    { data:{ source:'alex',    target:'resume',      line:'skill'    } },
-    { data:{ source:'alex',    target:'calc',        line:'skill'    } },
-    { data:{ source:'alex',    target:'reviews',     line:'trust'    } },
-    { data:{ source:'alex',    target:'effort',      line:'fairness' } },
-    { data:{ source:'maria',   target:'logos',       line:'skill'    } },
-    { data:{ source:'maria',   target:'branding',    line:'skill'    } },
-    { data:{ source:'maria',   target:'photography', line:'skill'    } },
-    { data:{ source:'maria',   target:'portfolio',   line:'trust'    } },
-    { data:{ source:'maria',   target:'balanced',    line:'fairness' } },
-    { data:{ source:'daniel',  target:'repair',      line:'skill'    } },
-    { data:{ source:'daniel',  target:'wifi',        line:'skill'    } },
-    { data:{ source:'daniel',  target:'verification',line:'trust'    } },
-    { data:{ source:'daniel',  target:'agreement',   line:'fairness' } },
-    { data:{ source:'jasmine', target:'homework',    line:'skill'    } },
-    { data:{ source:'jasmine', target:'notes',       line:'skill'    } },
-    { data:{ source:'jasmine', target:'worthit',     line:'fairness' } },
-    { data:{ source:'kevin',   target:'bookkeeping', line:'skill'    } },
-    { data:{ source:'kevin',   target:'consulting',  line:'skill'    } },
-    { data:{ source:'kevin',   target:'marketing',   line:'skill'    } },
-    { data:{ source:'kevin',   target:'trackrecord', line:'trust'    } },
-    { data:{ source:'lina',    target:'photoshoots', line:'skill'    } },
-    { data:{ source:'lina',    target:'communication',line:'trust'   } },
-    { data:{ source:'lina',    target:'expectations',line:'fairness' } },
-    { data:{ source:'marcus',  target:'gym',         line:'skill'    } },
-    { data:{ source:'marcus',  target:'consistency', line:'fairness' } },
-    { data:{ source:'emily',   target:'reputation',  line:'trust'    } },
-    { data:{ source:'robert',  target:'verification',line:'trust'    } },
-    { data:{ source:'robert',  target:'agreement',   line:'fairness' } },
-    { data:{ source:'linda',   target:'communication',line:'trust'   } },
-    { data:{ source:'linda',   target:'expectations',line:'fairness' } }
+    { data:{ source:'alex',    target:'resume',       line:'skill'    } },
+    { data:{ source:'alex',    target:'calc',         line:'skill'    } },
+    { data:{ source:'alex',    target:'reviews',      line:'trust'    } },
+    { data:{ source:'alex',    target:'effort',       line:'fairness' } },
+    { data:{ source:'maria',   target:'logos',        line:'skill'    } },
+    { data:{ source:'maria',   target:'branding',     line:'skill'    } },
+    { data:{ source:'maria',   target:'photography',  line:'skill'    } },
+    { data:{ source:'maria',   target:'portfolio',    line:'trust'    } },
+    { data:{ source:'maria',   target:'balanced',     line:'fairness' } },
+    { data:{ source:'daniel',  target:'repair',       line:'skill'    } },
+    { data:{ source:'daniel',  target:'wifi',         line:'skill'    } },
+    { data:{ source:'daniel',  target:'verification', line:'trust'    } },
+    { data:{ source:'daniel',  target:'agreement',    line:'fairness' } },
+    { data:{ source:'jasmine', target:'homework',     line:'skill'    } },
+    { data:{ source:'jasmine', target:'notes',        line:'skill'    } },
+    { data:{ source:'jasmine', target:'worthit',      line:'fairness' } },
+    { data:{ source:'kevin',   target:'bookkeeping',  line:'skill'    } },
+    { data:{ source:'kevin',   target:'consulting',   line:'skill'    } },
+    { data:{ source:'kevin',   target:'marketing',    line:'skill'    } },
+    { data:{ source:'kevin',   target:'trackrecord',  line:'trust'    } },
+    { data:{ source:'lina',    target:'photoshoots',  line:'skill'    } },
+    { data:{ source:'lina',    target:'communication',line:'trust'    } },
+    { data:{ source:'lina',    target:'expectations', line:'fairness' } },
+    { data:{ source:'marcus',  target:'gym',          line:'skill'    } },
+    { data:{ source:'marcus',  target:'consistency',  line:'fairness' } },
+    { data:{ source:'emily',   target:'reputation',   line:'trust'    } },
+    { data:{ source:'robert',  target:'verification', line:'trust'    } },
+    { data:{ source:'robert',  target:'agreement',    line:'fairness' } },
+    { data:{ source:'linda',   target:'communication',line:'trust'    } },
+    { data:{ source:'linda',   target:'expectations', line:'fairness' } }
   ],
   style: [
-    // BASE NODE
-    {
-      selector: 'node',
-      style: {
-        'label': 'data(label)',
-        'font-size': 11,
-        'font-weight': 600,
-        'text-wrap': 'wrap',
-        'text-max-width': '100px',
-        'color': 'white',
-        'text-outline-width': 3,
-        'text-outline-color': '#000',
-        'text-valign': 'center',
-        'text-halign': 'center',
-        'border-width': 2,
-        'border-color': 'rgba(255,255,255,0.15)',
-        'transition-property': 'opacity, width, height, font-size, text-outline-width, border-width, shadow-blur',
-        'transition-duration': '300ms'
-      }
-    },
-    // PARTICIPANT
+    { selector: 'node', style: {
+      'label': 'data(label)',
+      'font-size': 11, 'font-weight': 600,
+      'text-wrap': 'wrap', 'text-max-width': '100px',
+      'color': 'white', 'text-outline-width': 3, 'text-outline-color': '#000',
+      'text-valign': 'center', 'text-halign': 'center',
+      'border-width': 2, 'border-color': 'rgba(255,255,255,0.15)',
+      'transition-property': 'opacity, width, height, font-size, text-outline-width, border-width',
+      'transition-duration': '300ms'
+    }},
     { selector: 'node[type="participant"]', style: {
       'background-color': '#38bdf8', 'width': 90, 'height': 90,
       'shadow-color': '#38bdf8', 'shadow-blur': 40, 'shadow-opacity': 1
     }},
-    // SKILL
     { selector: 'node[type="skill"]', style: {
       'background-color': '#00ffa6', 'width': 34, 'height': 34,
       'shadow-color': '#00ffa6', 'shadow-blur': 18, 'shadow-opacity': 0.8
     }},
-    // TRUST
     { selector: 'node[type="trust"]', style: {
       'background-color': '#ffb347', 'width': 42, 'height': 42,
       'shadow-color': '#ffb347', 'shadow-blur': 25, 'shadow-opacity': 0.9
     }},
-    // FAIRNESS
     { selector: 'node[type="fairness"]', style: {
       'background-color': '#ff4fa3', 'width': 42, 'height': 42,
       'shadow-color': '#ff4fa3', 'shadow-blur': 25, 'shadow-opacity': 0.9
     }},
-    // EDGES
     { selector: 'edge', style: {
       'curve-style': 'segments',
       'segment-distances': '40 -40 40', 'segment-weights': '0.2 0.5 0.8',
       'width': 5, 'opacity': 0.85, 'line-cap': 'round',
-      'transition-property': 'opacity, width, shadow-blur',
-      'transition-duration': '300ms'
+      'transition-property': 'opacity, width', 'transition-duration': '300ms'
     }},
     { selector: 'edge[line="skill"]',    style: { 'line-color': '#00ffa6', 'shadow-color': '#00ffa6', 'shadow-blur': 10, 'shadow-opacity': 0.5 } },
     { selector: 'edge[line="trust"]',    style: { 'line-color': '#ffb347', 'shadow-color': '#ffb347', 'shadow-blur': 10, 'shadow-opacity': 0.5 } },
     { selector: 'edge[line="fairness"]', style: { 'line-color': '#ff4fa3', 'shadow-color': '#ff4fa3', 'shadow-blur': 10, 'shadow-opacity': 0.5 } },
-
-    // ── DIM: everything goes nearly invisible ──────────────────
-    { selector: '.dim', style: {
-      'opacity': 0.06,
-      'text-opacity': 0
-    }},
-
-    // ── FOCUSED NODE: full bright + bigger font + thick border ──
+    { selector: '.dim', style: { 'opacity': 0.05, 'text-opacity': 0 } },
     { selector: '.focus-node', style: {
-      'opacity': 1,
-      'font-size': 15,
-      'font-weight': 800,
-      'text-outline-width': 4,
-      'text-outline-color': '#000',
-      'color': '#ffffff',
-      'border-width': 4,
-      'border-color': 'rgba(255,255,255,0.7)',
-      'shadow-blur': 60,
-      'shadow-opacity': 1,
-      'text-opacity': 1
+      'opacity': 1, 'font-size': 15, 'font-weight': 800,
+      'text-outline-width': 4, 'text-outline-color': '#000',
+      'color': '#ffffff', 'border-width': 4,
+      'border-color': 'rgba(255,255,255,0.7)', 'text-opacity': 1
     }},
-
-    // ── FOCUSED EDGE: full bright + wider ─────────────────────
-    { selector: '.focus-edge', style: {
-      'opacity': 1,
-      'width': 7,
-      'shadow-blur': 20,
-      'shadow-opacity': 0.9
-    }},
-
-    // ── HOVER: font pops, node grows, glow intensifies ────────
+    { selector: '.focus-edge', style: { 'opacity': 1, 'width': 7 } },
     { selector: '.hovered', style: {
-      'font-size': 17,
-      'font-weight': 900,
-      'text-outline-width': 5,
-      'text-outline-color': '#000',
-      'color': '#ffffff',
-      'text-opacity': 1,
-      'border-width': 4,
-      'border-color': 'rgba(255,255,255,0.9)',
-      'shadow-blur': 70,
-      'shadow-opacity': 1
+      'font-size': 17, 'font-weight': 900,
+      'text-outline-width': 5, 'text-outline-color': '#000',
+      'color': '#ffffff', 'text-opacity': 1,
+      'border-width': 4, 'border-color': 'rgba(255,255,255,0.9)'
     }}
   ],
   layout: { name: 'preset' }
 });
 
-// ─── State ───────────────────────────────────────────────────────
-let focusActive  = false;   // true while a node selection is active
-let pulseTimers  = [];      // active setInterval IDs for breathing pulse
-let hoveredNode  = null;    // currently hovered node
+// ─── Canvas overlay for energy particles ──────────────────────────────────────
+const canvas = document.getElementById('energy-canvas');
+const ctx    = canvas.getContext('2d');
 
-// ─── Helpers ─────────────────────────────────────────────────────
-function getBaseSize(node) {
-  return BASE[node.data('type')] || 42;
+function resizeCanvas() {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
 }
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// Convert a Cytoscape model position to screen pixel coords
+function modelToScreen(pos) {
+  const pan  = cy.pan();
+  const zoom = cy.zoom();
+  return { x: pos.x * zoom + pan.x, y: pos.y * zoom + pan.y };
+}
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let focusActive   = false;
+let pulseTimers   = [];
+let hoveredNode   = null;
+let activeEdges   = [];    // edge objects currently flowing energy
+let breathPhase   = 0;     // shared phase for ALL active node breaths
+let particles     = [];    // [{t, edge, color, radius, speed}]
+let rafId         = null;  // requestAnimationFrame handle
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function getBaseSize(node) { return BASE[node.data('type')] || 42; }
 
 function stopAllPulse() {
   pulseTimers.forEach(id => clearInterval(id));
   pulseTimers = [];
 }
 
-// Breathing pulse: selected nodes gently scale up/down in opacity
-function startPulse(nodes) {
+function stopParticles() {
+  if (rafId) cancelAnimationFrame(rafId);
+  rafId = null;
+  particles = [];
+  activeEdges = [];
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+// ─── BREATH + ENERGY FLOW LOOP ───────────────────────────────────────────────
+// Called once after a node is selected.
+// `focusedNodes`  – cy collection of lit nodes
+// `focusedEdges`  – cy collection of lit edges
+function startEnergyLoop(focusedNodes, focusedEdges) {
   stopAllPulse();
+  stopParticles();
+
+  breathPhase = 0;
+  activeEdges = focusedEdges.toArray();
+
+  // Spawn one particle per edge, staggered
+  activeEdges.forEach((edge, i) => {
+    const color = LINE_COLORS[edge.data('line')] || '#ffffff';
+    particles.push({
+      t:      i / activeEdges.length,  // stagger start positions
+      edge,
+      color,
+      radius: 5,
+      speed:  0.004 + Math.random() * 0.003  // each particle slightly different pace
+    });
+    // also add a second trailing particle per edge for richness
+    particles.push({
+      t:      (i / activeEdges.length + 0.5) % 1,
+      edge,
+      color,
+      radius: 3.5,
+      speed:  0.003 + Math.random() * 0.002
+    });
+  });
+
+  function tick() {
+    rafId = requestAnimationFrame(tick);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // ── Advance breath ──────────────────────────────────────────
+    breathPhase += 0.045;  // ~2.8 sec per full breath at 60fps
+    const breathSin = Math.sin(breathPhase);  // -1 → +1
+
+    // ── Pulse focused nodes in sync with breathSin ──────────────
+    focusedNodes.forEach(n => {
+      if (n.hasClass('dim')) return;
+      const base = getBaseSize(n);
+      // shadow grows/shrinks with breath
+      n.style('shadow-blur',  (base * 0.5 + breathSin * base * 0.45).toString());
+      // border width breathes 2 → 6
+      n.style('border-width', (4 + breathSin * 2).toString());
+    });
+
+    // ── Draw energy particles ───────────────────────────────────
+    particles.forEach(p => {
+      // speed is modulated by breath: fast on exhale (sin > 0), slow on inhale
+      const breathSpeed = p.speed * (1 + breathSin * 0.6);
+      p.t = (p.t + breathSpeed) % 1;
+
+      // Get endpoint screen coords
+      const src = p.edge.source();
+      const tgt = p.edge.target();
+      if (!src || !tgt) return;
+
+      const sp = modelToScreen(src.position());
+      const tp = modelToScreen(tgt.position());
+
+      // Lerp along the straight line (matches the visual edge closely enough)
+      const px = sp.x + (tp.x - sp.x) * p.t;
+      const py = sp.y + (tp.y - sp.y) * p.t;
+
+      // Particle glows brighter on exhale (breathSin > 0)
+      const alpha = 0.55 + breathSin * 0.35;
+      const r     = p.radius * (0.85 + breathSin * 0.3);
+
+      // Draw glowing dot
+      const grad = ctx.createRadialGradient(px, py, 0, px, py, r * 3.5);
+      grad.addColorStop(0,   hexAlpha(p.color, alpha));
+      grad.addColorStop(0.4, hexAlpha(p.color, alpha * 0.6));
+      grad.addColorStop(1,   hexAlpha(p.color, 0));
+      ctx.beginPath();
+      ctx.arc(px, py, r * 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // Bright core
+      ctx.beginPath();
+      ctx.arc(px, py, r, 0, Math.PI * 2);
+      ctx.fillStyle = hexAlpha('#ffffff', alpha * 0.9);
+      ctx.fill();
+    });
+  }
+
+  rafId = requestAnimationFrame(tick);
+}
+
+// ─── IDLE PULSE (no selection) ────────────────────────────────────────────────
+function startIdlePulse() {
+  stopAllPulse();
+  stopParticles();
   let phase = 0;
   const id = setInterval(() => {
-    phase += 0.07;
-    const glow = 0.82 + Math.sin(phase) * 0.18; // oscillates 0.64 ↔ 1.0
-    nodes.forEach(n => {
-      if (!n.hasClass('dim')) {
-        n.style('shadow-blur', (getBaseSize(n) * 0.7 + Math.sin(phase) * 20).toString());
-        n.style('border-width', (3 + Math.sin(phase) * 2).toString());
+    if (focusActive) { clearInterval(id); return; }
+    phase += 0.025;
+    cy.nodes().forEach(n => {
+      if (n !== hoveredNode) {
+        const base = getBaseSize(n) * 0.4;
+        n.style('shadow-blur', (base + Math.sin(phase + n.position('x') * 0.002) * 10).toString());
       }
     });
-  }, 50);
+  }, 60);
   pulseTimers.push(id);
 }
 
-// ─── CLICK: focus / dim ──────────────────────────────────────────
+// ─── CLICK: focus + dim + pan/fit + energy flow ───────────────────────────────
 cy.on('tap', 'node', function(evt) {
   const start = evt.target;
 
-  // If clicking the already-focused node, toggle off
   if (focusActive && start.hasClass('focus-node') && !start.hasClass('dim')) {
-    resetAll();
-    return;
+    resetAll(); return;
   }
 
-  stopAllPulse();
   cy.elements().removeClass('dim focus-node focus-edge hovered');
-
-  // Dim everything first
   cy.nodes().addClass('dim');
   cy.edges().addClass('dim');
 
-  // BFS from clicked node
-  const visited  = new Set([start.id()]);
-  const queue    = [start];
-  const selected = cy.collection();
+  // BFS to find all connected nodes + edges
+  const visited = new Set([start.id()]);
+  const queue   = [start];
+  let focNodes  = cy.collection();
+  let focEdges  = cy.collection();
 
-  start.removeClass('dim');
-  start.addClass('focus-node');
-  selected.merge(start);
+  start.removeClass('dim').addClass('focus-node');
+  focNodes = focNodes.merge(start);
 
   while (queue.length) {
     const node = queue.shift();
@@ -298,41 +370,59 @@ cy.on('tap', 'node', function(evt) {
         if (!visited.has(n.id())) {
           visited.add(n.id());
           queue.push(n);
-          n.removeClass('dim');
-          n.addClass('focus-node');
-          selected.merge(n);
+          n.removeClass('dim').addClass('focus-node');
+          focNodes = focNodes.merge(n);
         }
-        edge.removeClass('dim');
-        edge.addClass('focus-edge');
       });
+      edge.removeClass('dim').addClass('focus-edge');
+      focEdges = focEdges.merge(edge);
     });
   }
 
   focusActive = true;
-  startPulse(selected);
+
+  // ── Auto pan + fit to selected subgraph, perfectly sized for viewport ──
+  cy.animate({
+    fit: {
+      eles: focNodes,
+      padding: Math.min(window.innerWidth, window.innerHeight) * 0.12
+    }
+  }, {
+    duration: 550,
+    easing: 'ease-in-out-cubic'
+  });
+
+  // Start energy loop (breath + particles)
+  startEnergyLoop(focNodes, focEdges);
 });
 
-// ─── BACKGROUND TAP: reset ───────────────────────────────────────
+// ─── BACKGROUND TAP: reset ────────────────────────────────────────────────────
 cy.on('tap', function(e) {
   if (e.target === cy) resetAll();
 });
 
 function resetAll() {
   stopAllPulse();
+  stopParticles();
   cy.elements().removeClass('dim focus-node focus-edge hovered');
+  // Reset all node sizes/glows to base
+  cy.nodes().forEach(n => {
+    n.style('shadow-blur', '');
+    n.style('border-width', '2');
+  });
   focusActive = false;
-  // restart gentle idle pulse on everything
+  // Fit everything back into view
+  cy.animate({ fit: { eles: cy.nodes(), padding: 60 } }, { duration: 500, easing: 'ease-in-out-cubic' });
   startIdlePulse();
 }
 
-// ─── HOVER: font pop + size grow ────────────────────────────────
+// ─── HOVER ────────────────────────────────────────────────────────────────────
 cy.on('mouseover', 'node', function(evt) {
   const node = evt.target;
   hoveredNode = node;
-  // Don't show hover on dimmed nodes
   if (node.hasClass('dim')) return;
   node.addClass('hovered');
-  const big = node.data('type') === 'participant' ? HOVER_SIZE + 20 : HOVER_SIZE;
+  const big = node.data('type') === 'participant' ? 120 : 90;
   node.stop().animate({ style: { width: big, height: big } }, { duration: 180 });
 });
 
@@ -340,27 +430,18 @@ cy.on('mouseout', 'node', function(evt) {
   const node = evt.target;
   hoveredNode = null;
   node.removeClass('hovered');
-  const s = getBaseSize(node);
-  node.stop().animate({ style: { width: s, height: s } }, { duration: 180 });
+  node.stop().animate({ style: { width: getBaseSize(node), height: getBaseSize(node) } }, { duration: 180 });
 });
 
-// ─── IDLE PULSE: gentle ambient glow when nothing selected ───────
-function startIdlePulse() {
-  if (focusActive) return;
-  let phase = 0;
-  const id = setInterval(() => {
-    if (focusActive) { clearInterval(id); return; }
-    phase += 0.025;
-    cy.nodes().forEach(n => {
-      if (!n.hasClass('dim') && n !== hoveredNode) {
-        const base = getBaseSize(n) * 0.4;
-        n.style('shadow-blur', (base + Math.sin(phase + n.position('x') * 0.002) * 12).toString());
-      }
-    });
-  }, 60);
-  pulseTimers.push(id);
+// ─── Utility: hex color + alpha → rgba string ────────────────────────────────
+function hexAlpha(hex, a) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a.toFixed(3)})`;
 }
 
+// ─── Boot ─────────────────────────────────────────────────────────────────────
 startIdlePulse();
 </script>
 </body>
