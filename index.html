@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SkillSwap — COGS 128 Final Project</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  height: 100%; font-family: Inter, system-ui, sans-serif;
+  background: radial-gradient(circle at 30% 20%, #1a2338 0%, #0d1320 40%, #05080f 80%, #000 100%);
+  color: #e2e8f0; min-height: 100vh;
+}
+body { display: flex; flex-direction: column; align-items: center; padding: 48px 24px 80px; }
+
+.badge {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+  color: #38bdf8; border: 1px solid #38bdf844; border-radius: 999px;
+  padding: 4px 14px; margin-bottom: 28px;
+  background: rgba(56,189,248,0.07);
+}
+h1 {
+  font-size: clamp(2rem, 6vw, 3.8rem); font-weight: 900; text-align: center;
+  line-height: 1.1; letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #e2e8f0 30%, #38bdf8 70%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; margin-bottom: 16px;
+}
+.sub {
+  font-size: clamp(0.95rem, 2vw, 1.15rem); color: #94a3b8;
+  text-align: center; max-width: 520px; line-height: 1.6; margin-bottom: 56px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px; width: 100%; max-width: 900px;
+  margin-bottom: 56px;
+}
+.card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px; padding: 28px;
+  text-decoration: none; color: inherit;
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(56,189,248,0.4);
+  background: rgba(56,189,248,0.06);
+}
+.card-icon { font-size: 2rem; }
+.card-title { font-size: 1.1rem; font-weight: 800; color: #f1f5f9; }
+.card-desc  { font-size: 0.88rem; color: #94a3b8; line-height: 1.55; }
+.card-tag {
+  display: inline-block; margin-top: 4px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 3px 10px; border-radius: 999px;
+}
+.tag-blue   { background: rgba(56,189,248,0.15);  color: #38bdf8; }
+.tag-green  { background: rgba(0,255,166,0.12);   color: #00ffa6; }
+.tag-orange { background: rgba(255,179,71,0.15);  color: #ffb347; }
+.tag-pink   { background: rgba(255,79,163,0.15);  color: #ff4fa3; }
+
+.team {
+  max-width: 900px; width: 100%;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  padding-top: 36px; text-align: center;
+}
+.team h2 { font-size: 0.8rem; letter-spacing: 0.1em; text-transform: uppercase; color: #475569; margin-bottom: 14px; }
+.members {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;
+}
+.member {
+  font-size: 0.85rem; color: #94a3b8;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 999px; padding: 5px 16px;
+}
+</style>
+</head>
+<body>
+
+<div class="badge">UC Merced &nbsp;&middot;&nbsp; COGS 128 &nbsp;&middot;&nbsp; Spring 2026</div>
+
+<h1>SkillSwap</h1>
+<p class="sub">A peer-to-peer skill exchange platform built on algorithmic trust, transparent fairness scoring, and community-verified exchanges.</p>
+
+<div class="grid">
+
+  <a class="card" href="assets/trust-exchange-graph.html">
+    <div class="card-icon">🕸️</div>
+    <div class="card-title">Trust Exchange Map</div>
+    <div class="card-desc">Interactive network graph — click any node to focus its connections. Watch energy breathe outward along each edge and pull back in sync.</div>
+    <span class="card-tag tag-blue">Interactive</span>
+  </a>
+
+  <a class="card" href="assets/skillswap_3d_clean.html">
+    <div class="card-icon">🌐</div>
+    <div class="card-title">3D Match Visualization</div>
+    <div class="card-desc">Three-dimensional view of the SkillSwap matching model — skill nodes, trust vectors, and fairness weights rendered in space.</div>
+    <span class="card-tag tag-green">3D View</span>
+  </a>
+
+  <a class="card" href="docs/FINAL_REPORT.md">
+    <div class="card-icon">📄</div>
+    <div class="card-title">Final Report</div>
+    <div class="card-desc">Complete 30-point rubric document covering proposal, interviews, personas, prototype analysis, user testing evaluation, and project management.</div>
+    <span class="card-tag tag-orange">30 pts</span>
+  </a>
+
+  <a class="card" href="https://github.com/siSsyMidicable/Cogs128_Final_Project" target="_blank" rel="noopener">
+    <div class="card-icon">💻</div>
+    <div class="card-title">GitHub Repository</div>
+    <div class="card-desc">Full source code — React Native / Expo client, matching engine, server, interview data, and all project documentation.</div>
+    <span class="card-tag tag-pink">Source</span>
+  </a>
+
+</div>
+
+<div class="team">
+  <h2>Group Members</h2>
+  <div class="members">
+    <span class="member">Eduardo Leyva</span>
+    <span class="member">James Burlinson</span>
+    <span class="member">Yongva Sean Yang</span>
+    <span class="member">Shabach Karathi</span>
+    <span class="member">Nachturia Rhetorica</span>
+  </div>
+</div>
+
+</body>
+</html>
