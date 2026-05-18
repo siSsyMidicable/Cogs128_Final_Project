@@ -3,243 +3,260 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SkillSwap — COGS 128 Final Project</title>
+<title>SkillSwap — COGS 128</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
-  height: 100%;
+  min-height: 100%;
   font-family: 'JetBrains Mono', 'Fira Mono', 'Courier New', monospace;
   background: #05080f;
   color: #c9d1de;
-  min-height: 100vh;
 }
 
 body {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 56px 28px 100px;
+  align-items: flex-start;
+  padding: 64px 0 120px 0;
+  max-width: 860px;
+  margin: 0 auto;
 }
 
-/* ── Badge ──────────────────────────────────────── */
+/* ── Header block ───────────────────────────────── */
+.header {
+  padding-left: 44px;
+  margin-bottom: 60px;
+  position: relative;
+}
+.header::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 18px;
+  width: 3px;
+  height: 100%;
+  background: #38bdf8;
+}
+
 .badge {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
+  font-size: 9px;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: #38bdf8;
-  border: 1px solid #38bdf8;
-  padding: 4px 12px;
-  margin-bottom: 36px;
-}
-
-/* ── Title ──────────────────────────────────────── */
-h1 {
-  font-size: clamp(2.2rem, 6vw, 4rem);
-  font-weight: 900;
-  text-align: center;
-  line-height: 1.0;
-  letter-spacing: -0.03em;
-  color: #e2e8f0;
-  margin-bottom: 20px;
-}
-
-/* Ruled line under title — like a rail */
-h1::after {
-  content: '';
+  margin-bottom: 14px;
   display: block;
-  margin: 14px auto 0;
-  width: 60px;
-  height: 3px;
-  background: #38bdf8;
+}
+
+h1 {
+  font-size: clamp(2.4rem, 7vw, 4.2rem);
+  font-weight: 900;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  color: #e2e8f0;
+  margin-bottom: 16px;
 }
 
 .sub {
   font-family: Inter, system-ui, sans-serif;
-  font-size: clamp(0.88rem, 2vw, 1.05rem);
-  color: #64748b;
-  text-align: center;
-  max-width: 500px;
+  font-size: 0.9rem;
+  color: #4a5568;
+  max-width: 440px;
   line-height: 1.7;
-  margin-bottom: 64px;
-  margin-top: 18px;
 }
 
-/* ── Grid ──────────────────────────────────────── */
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 0;
-  width: 100%;
-  max-width: 920px;
-  margin-bottom: 64px;
-  border: 1px solid #1e293b;
-}
-
-/* ── Cards ─────────────────────────────────────── */
-.card {
-  background: #080c14;
-  border-right: 1px solid #1e293b;
-  border-bottom: 1px solid #1e293b;
-  padding: 28px 24px 24px;
-  text-decoration: none;
-  color: inherit;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+/* ── The vertical spine ─────────────────────────────────
+   One continuous rail the cards branch off from
+*/
+.rail {
   position: relative;
-  transition: background 0.15s ease;
+  width: 100%;
+  padding-left: 18px;
+  margin-bottom: 72px;
 }
-
-/* Left rail accent — color per card type */
-.card::before {
+.rail::before {
   content: '';
   position: absolute;
-  top: 0; left: 0;
-  width: 3px;
+  top: 0; left: 18px;
+  width: 2px;
   height: 100%;
-  background: var(--rail);
-  opacity: 0.9;
+  background: #1e293b;
 }
 
-.card:hover {
-  background: #0d1525;
+/* ── Each station (card) ──────────────────────────────── */
+.station {
+  position: relative;
+  padding: 0 0 52px 0;
 }
 
-.card:hover::before {
-  opacity: 1;
+/* Branch line: horizontal tick from spine to card */
+.station::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 18px; /* spine x */
+  height: 2px;
+  background: var(--rail-color);
+  width: var(--branch-w);
 }
 
-.card-blue  { --rail: #38bdf8; }
-.card-green { --rail: #00ffa6; }
-.card-orange{ --rail: #ffb347; }
-.card-pink  { --rail: #ff4fa3; }
-
-.card-icon {
-  font-size: 1.5rem;
-  line-height: 1;
-  margin-bottom: 2px;
+/* Station dot on the spine */
+.station::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 14px;
+  width: 10px;
+  height: 10px;
+  background: var(--rail-color);
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
 }
+
+.card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  padding: 18px 20px 16px;
+  border-left: 3px solid var(--rail-color);
+  background: #080c14;
+  margin-left: var(--card-indent);
+  max-width: 520px;
+  transition: background 0.12s;
+}
+
+.card:hover { background: #0c1220; }
 
 .card-title {
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   font-weight: 700;
-  color: #e2e8f0;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
+  color: var(--rail-color);
+  margin-bottom: 8px;
 }
 
 .card-desc {
   font-family: Inter, system-ui, sans-serif;
-  font-size: 0.83rem;
-  color: #64748b;
-  line-height: 1.6;
+  font-size: 0.82rem;
+  color: #4a5568;
+  line-height: 1.65;
+  margin-bottom: 10px;
 }
 
 .card-tag {
-  display: inline-block;
-  margin-top: 6px;
   font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  padding: 2px 8px;
-  border: 1px solid currentColor;
-  width: fit-content;
+  color: var(--rail-color);
+  opacity: 0.7;
 }
+.card-tag::before { content: '▶ '; }
 
-.tag-blue   { color: #38bdf8; }
-.tag-green  { color: #00ffa6; }
-.tag-orange { color: #ffb347; }
-.tag-pink   { color: #ff4fa3; }
+/* ── Per-station offsets — asymmetric, each one different ──────── */
+.s1 { --rail-color: #38bdf8; --branch-w: 52px;  --card-indent: 82px;  }
+.s2 { --rail-color: #00ffa6; --branch-w: 88px;  --card-indent: 118px; }
+.s3 { --rail-color: #ffb347; --branch-w: 38px;  --card-indent: 68px;  }
+.s4 { --rail-color: #ff4fa3; --branch-w: 70px;  --card-indent: 100px; }
 
-/* ── Team ──────────────────────────────────────── */
+/* ── Team ───────────────────────────────────────── */
 .team {
-  max-width: 920px;
-  width: 100%;
-  border-top: 1px solid #1e293b;
-  padding-top: 32px;
-  text-align: left;
+  padding-left: 44px;
+  position: relative;
+}
+.team::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 18px;
+  width: 3px;
+  height: 100%;
+  background: #1e293b;
 }
 
-.team h2 {
-  font-size: 9px;
-  letter-spacing: 0.2em;
+.team-label {
+  font-size: 8px;
+  letter-spacing: 0.24em;
   text-transform: uppercase;
-  color: #334155;
-  margin-bottom: 18px;
+  color: #2d3748;
+  margin-bottom: 12px;
+  display: block;
 }
 
 .members {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0;
-}
-
-.member {
+  font-family: Inter, system-ui, sans-serif;
   font-size: 0.8rem;
-  color: #475569;
-  border: 1px solid #1e293b;
-  border-left: 3px solid #1e293b;
-  padding: 6px 14px;
-  margin: 0 8px 8px 0;
-  transition: color 0.15s, border-color 0.15s;
+  color: #334155;
+  line-height: 2;
 }
 
-.member:hover {
-  color: #94a3b8;
-  border-color: #334155;
+.members span {
+  display: inline;
+}
+.members span + span::before {
+  content: ' / ';
+  color: #1e293b;
+}
+
+/* ── Responsive ──────────────────────────────────────── */
+@media (max-width: 600px) {
+  .s1 { --branch-w: 30px; --card-indent: 58px; }
+  .s2 { --branch-w: 44px; --card-indent: 72px; }
+  .s3 { --branch-w: 22px; --card-indent: 50px; }
+  .s4 { --branch-w: 36px; --card-indent: 64px; }
+  .card { max-width: calc(100vw - 80px); }
 }
 </style>
 </head>
 <body>
 
-<div class="badge">UC Merced &nbsp;&middot;&nbsp; COGS 128 &nbsp;&middot;&nbsp; Spring 2026</div>
+<div class="header">
+  <span class="badge">UC Merced &nbsp;·&nbsp; COGS 128 &nbsp;·&nbsp; Spring 2026</span>
+  <h1>SkillSwap</h1>
+  <p class="sub">A peer-to-peer skill exchange platform built on algorithmic trust, transparent fairness scoring, and community-verified exchanges.</p>
+</div>
 
-<h1>SkillSwap</h1>
-<p class="sub">A peer-to-peer skill exchange platform built on algorithmic trust, transparent fairness scoring, and community-verified exchanges.</p>
+<div class="rail">
 
-<div class="grid">
+  <div class="station s1">
+    <a class="card" href="assets/trust-exchange-graph.html">
+      <div class="card-title">Trust Exchange Map</div>
+      <div class="card-desc">Interactive network graph — click any node to focus its connections. Watch energy breathe outward along each edge and pull back in sync.</div>
+      <span class="card-tag">Interactive</span>
+    </a>
+  </div>
 
-  <a class="card card-blue" href="assets/trust-exchange-graph.html">
-    <div class="card-icon">🕸️</div>
-    <div class="card-title">Trust Exchange Map</div>
-    <div class="card-desc">Interactive network graph — click any node to focus its connections. Watch energy breathe outward along each edge and pull back in sync.</div>
-    <span class="card-tag tag-blue">Interactive</span>
-  </a>
+  <div class="station s2">
+    <a class="card" href="assets/skillswap_3d_clean.html">
+      <div class="card-title">3D Match Visualization</div>
+      <div class="card-desc">Three-dimensional view of the SkillSwap matching model — skill nodes, trust vectors, and fairness weights rendered in space.</div>
+      <span class="card-tag">3D View</span>
+    </a>
+  </div>
 
-  <a class="card card-green" href="assets/skillswap_3d_clean.html">
-    <div class="card-icon">🌐</div>
-    <div class="card-title">3D Match Visualization</div>
-    <div class="card-desc">Three-dimensional view of the SkillSwap matching model — skill nodes, trust vectors, and fairness weights rendered in space.</div>
-    <span class="card-tag tag-green">3D View</span>
-  </a>
+  <div class="station s3">
+    <a class="card" href="docs/FINAL_REPORT.md">
+      <div class="card-title">Final Report</div>
+      <div class="card-desc">Complete 30-point rubric document covering proposal, interviews, personas, prototype analysis, user testing evaluation, and project management.</div>
+      <span class="card-tag">30 pts</span>
+    </a>
+  </div>
 
-  <a class="card card-orange" href="docs/FINAL_REPORT.md">
-    <div class="card-icon">📄</div>
-    <div class="card-title">Final Report</div>
-    <div class="card-desc">Complete 30-point rubric document covering proposal, interviews, personas, prototype analysis, user testing evaluation, and project management.</div>
-    <span class="card-tag tag-orange">30 pts</span>
-  </a>
-
-  <a class="card card-pink" href="https://github.com/siSsyMidicable/Cogs128_Final_Project" target="_blank" rel="noopener">
-    <div class="card-icon">💻</div>
-    <div class="card-title">GitHub Repository</div>
-    <div class="card-desc">Full source code — React Native / Expo client, matching engine, server, interview data, and all project documentation.</div>
-    <span class="card-tag tag-pink">Source</span>
-  </a>
+  <div class="station s4">
+    <a class="card" href="https://github.com/siSsyMidicable/Cogs128_Final_Project" target="_blank" rel="noopener">
+      <div class="card-title">GitHub Repository</div>
+      <div class="card-desc">Full source code — React Native / Expo client, matching engine, server, interview data, and all project documentation.</div>
+      <span class="card-tag">Source</span>
+    </a>
+  </div>
 
 </div>
 
 <div class="team">
-  <h2>Group Members</h2>
+  <span class="team-label">Group Members</span>
   <div class="members">
-    <span class="member">Eduardo Leyva</span>
-    <span class="member">James Burlinson</span>
-    <span class="member">Yongva Sean Yang</span>
-    <span class="member">Shabach Karathi</span>
-    <span class="member">Nachtoria Rhetorica</span>
+    <span>Eduardo Leyva</span>
+    <span>James Burlinson</span>
+    <span>Yongva Sean Yang</span>
+    <span>Shabach Karathi</span>
+    <span>Nachtoria Rhetorica</span>
   </div>
 </div>
 
