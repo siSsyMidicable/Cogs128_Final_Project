@@ -348,9 +348,9 @@ The primary deviation from the original plan was in the user testing section: th
 
 The single most impactful change would be **establishing communication norms in week one, not week eight.** The project encountered significant coordination failures not because group members lacked capability, but because there was no agreed-upon communication channel, no shared deadline tracker, and no escalation path when a member went silent.
 
-From a management perspective, the lesson is that **process is not overhead — it is the product.** A weekly 15-minute sync, a shared task board, and a simple rule ("if you're blocked, say so within 24 hours") would have prevented most of the late-stage scramble. The technical work was the easy part. The group dynamics were the actual project management problem — and that is not a technical problem, it is a communication design problem.
+From a management perspective, the lesson is that **process is not overhead, it is the product.** A weekly 15-minute sync, a shared task board, and a simple rule ("if you're blocked, say so within 24 hours") would have prevented most of the late-stage scramble. The technical work was the easy part. The group dynamics were the actual project management problem, and that is not a technical problem, it is a communication design problem.
 
 ---
 
-*Submitted May 17, 2026 · COGS 128 · UC Merced*
+*Submitted Srping, 2026 · COGS 128 · UC Merced*
 *Prototype Lead & Project Manager: Nachturia Rhetorica (GitHub: [@siSsyMidicable](https://github.com/siSsyMidicable))*
