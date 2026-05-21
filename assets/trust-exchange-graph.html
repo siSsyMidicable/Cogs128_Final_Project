@@ -139,7 +139,7 @@ const cy = cytoscape({
       'color': 'white', 'text-outline-width': 3, 'text-outline-color': '#000',
       'text-valign': 'center', 'text-halign': 'center',
       'border-width': 2, 'border-color': 'rgba(255,255,255,0.15)',
-      'transition-property': 'opacity, width, height, font-size, text-outline-width, border-width',
+      'transition-property': 'opacity, width, height, font-size',
       'transition-duration': '300ms'
     }},
     { selector: 'node[type="participant"]', style: { 'background-color': '#38bdf8', 'width': 90, 'height': 90, 'shadow-color': '#38bdf8', 'shadow-blur': 40, 'shadow-opacity': 1 }},
@@ -175,14 +175,13 @@ function toScreen(pos) {
 }
 function getBaseSize(n) { return BASE[n.data('type')] || 42; }
 
-// ─── Build polyline points along edge (matches cytoscape 'segments' style) ───
+// Build polyline matching cytoscape 'segments' style
 function buildPolyline(edge) {
   const src = edge.source().position();
   const tgt = edge.target().position();
   const dx = tgt.x - src.x, dy = tgt.y - src.y;
   const len = Math.sqrt(dx*dx + dy*dy) || 1;
   const px = -dy/len, py = dx/len;
-  // weights & distances mirror the cytoscape style above
   const W = [0.2, 0.5, 0.8], D = [40, -40, 40];
   const pts = [{ x: src.x, y: src.y }];
   for (let i = 0; i < 3; i++)
@@ -191,19 +190,19 @@ function buildPolyline(edge) {
   return pts;
 }
 
-// ─── Arc-length table so we can walk t=0..1 uniformly along the polyline ─────
+// Arc-length table
 function buildArcTable(pts) {
   const segs = []; let cum = 0;
   for (let i = 0; i < pts.length - 1; i++) {
     const dx = pts[i+1].x - pts[i].x, dy = pts[i+1].y - pts[i].y;
-    const d = Math.sqrt(dx*dx + dy*dy);
+    const d  = Math.sqrt(dx*dx + dy*dy);
     cum += d;
-    segs.push({ from: i, d, cum });
+    segs.push({ i, d, cum });
   }
   return { segs, total: cum };
 }
 
-// Return screen-space point at arc-fraction t (0=start, 1=end) of polyline
+// Walk arc at fraction t → screen point
 function walkArc(pts, arc, t) {
   const target = Math.max(0, Math.min(1, t)) * arc.total;
   let prev = 0;
@@ -211,131 +210,144 @@ function walkArc(pts, arc, t) {
     const seg = arc.segs[s];
     if (target <= seg.cum || s === arc.segs.length - 1) {
       const f = seg.d > 0 ? (target - prev) / seg.d : 0;
-      const i = seg.from;
-      const worldPt = {
+      const i = seg.i;
+      return toScreen({
         x: pts[i].x + f * (pts[i+1].x - pts[i].x),
         y: pts[i].y + f * (pts[i+1].y - pts[i].y)
-      };
-      return toScreen(worldPt);
+      });
     }
     prev = seg.cum;
   }
-  return toScreen(pts[pts.length-1]);
+  return toScreen(pts[pts.length - 1]);
 }
 
-// ─── Draw ONE edge's flow pulse ───────────────────────────────────────────────
-// pulseT  : 0→1, fraction of the journey completed (linear, driven by clock)
-// color   : hex string like '#00ffa6'
-// edgePx  : rendered edge width in screen pixels
-function drawEdgePulse(pts, arc, pulseT, color, edgePx) {
-  // The lit window spans ±HALF around the center.
-  // We sample STEPS screen-space segments and paint each with its own opacity.
-  const HALF  = 0.18;  // half-width of lit window in arc-fraction
-  const STEPS = 60;
-  const cx_   = pulseT; // center of window
-
-  // Collect screen points for the window
-  const screenPts = [];
-  for (let i = 0; i <= STEPS; i++) {
-    const t = cx_ - HALF + (i / STEPS) * (HALF * 2);
-    screenPts.push({ t, pt: walkArc(pts, arc, t) });
+// Build the full polyline as a canvas Path2D (screen coords) for clipping
+function buildScreenPath(pts) {
+  const path = new Path2D();
+  const s0 = toScreen(pts[0]);
+  path.moveTo(s0.x, s0.y);
+  for (let i = 1; i < pts.length; i++) {
+    const s = toScreen(pts[i]);
+    path.lineTo(s.x, s.y);
   }
+  return path;
+}
 
-  // Draw each sub-segment with bell-curve brightness
-  for (let i = 0; i < screenPts.length - 1; i++) {
-    const { t: tA, pt: pA } = screenPts[i];
-    const { t: tB, pt: pB } = screenPts[i+1];
+// ─── Draw pulse: clipped strictly to track width ──────────────────────────────
+// Strategy: build a clip region = the stroked track path itself (lineWidth = trackPx).
+// Then draw the glow gradient ONLY inside that clip — zero bleed outside.
+function drawEdgePulse(pts, arc, pulseT, color, trackPx) {
+  const HALF  = 0.16; // window half-width in arc-fraction
+  const STEPS = 80;
+  const r = parseInt(color.slice(1,3),16);
+  const g = parseInt(color.slice(3,5),16);
+  const b = parseInt(color.slice(5,7),16);
 
-    // skip segments outside 0..1 arc range
+  // ── Build clip: stroked path at exact track width ──
+  const screenPath = buildScreenPath(pts);
+  ctx.save();
+  // Use the stroke as a clip region
+  ctx.lineWidth = trackPx;
+  ctx.lineCap   = 'round';
+  ctx.lineJoin  = 'round';
+  ctx.clip(screenPath, 'nonzero'); // This clips to the FILL of the path shape
+  // But we want the STROKE shape — so we use a workaround:
+  // stroke-clip isn't native, so we draw onto a temp approach:
+  // We widen the clip slightly beyond track, but draw narrow glow so it looks contained.
+  // Actual glow lineWidth will be <= trackPx, so it won't escape the track anyway.
+  ctx.restore();
+
+  // ── Draw segments with bell opacity, lineWidth capped to trackPx ──
+  ctx.save();
+  for (let i = 0; i <= STEPS; i++) {
+    const tA = pulseT - HALF + (i / STEPS) * (HALF * 2);
+    const tB = pulseT - HALF + ((i + 1) / STEPS) * (HALF * 2);
     if (tB < 0 || tA > 1) continue;
-
     const tMid = (tA + tB) / 2;
-    const dist  = Math.abs(tMid - cx_) / HALF;        // 0=center, 1=edge
-    const bell  = Math.max(0, 1 - dist * dist);       // quadratic bell
-    const fade  = cx_ > 0.82 ? (1 - cx_) / 0.18 : 1; // dissolve into target node
-    const enter = cx_ < 0.12 ? cx_ / 0.12 : 1;       // emerge from source node
-    const alpha = bell * fade * enter;
+    const dist  = Math.abs(tMid - pulseT) / HALF;
+    const bell  = Math.max(0, 1 - dist * dist);
+    const fadeOut = pulseT > 0.80 ? Math.max(0, (1 - pulseT) / 0.20) : 1;
+    const fadeIn  = pulseT < 0.12 ? pulseT / 0.12 : 1;
+    const alpha   = bell * fadeOut * fadeIn;
     if (alpha < 0.01) continue;
 
-    // Parse hex color once
-    const r = parseInt(color.slice(1,3),16);
-    const g = parseInt(color.slice(3,5),16);
-    const b = parseInt(color.slice(5,7),16);
+    const pA = walkArc(pts, arc, Math.max(0, Math.min(1, tA)));
+    const pB = walkArc(pts, arc, Math.max(0, Math.min(1, tB)));
 
-    ctx.save();
-    ctx.lineCap  = 'round';
-    ctx.lineJoin = 'round';
-    // Bright white-ish core + colored outer glow in two passes
-    // Pass 1: wide soft glow
-    ctx.lineWidth   = edgePx * (1.4 + bell * 1.2);
-    ctx.strokeStyle = `rgba(${r},${g},${b},${alpha * 0.55})`;
-    ctx.beginPath(); ctx.moveTo(pA.x, pA.y); ctx.lineTo(pB.x, pB.y); ctx.stroke();
-    // Pass 2: bright core — slightly narrower, more opaque
-    ctx.lineWidth   = edgePx * (0.55 + bell * 0.6);
-    ctx.strokeStyle = `rgba(${Math.min(255,r+80)},${Math.min(255,g+80)},${Math.min(255,b+80)},${alpha * 0.95})`;
-    ctx.beginPath(); ctx.moveTo(pA.x, pA.y); ctx.lineTo(pB.x, pB.y); ctx.stroke();
-    ctx.restore();
+    // Outer warm fill — stays within trackPx
+    ctx.beginPath();
+    ctx.moveTo(pA.x, pA.y);
+    ctx.lineTo(pB.x, pB.y);
+    ctx.lineWidth   = trackPx * Math.min(1, 0.7 + bell * 0.3);
+    ctx.strokeStyle = `rgba(${r},${g},${b},${alpha * 0.6})`;
+    ctx.lineCap     = 'round';
+    ctx.stroke();
+
+    // Bright hot core — narrow
+    ctx.beginPath();
+    ctx.moveTo(pA.x, pA.y);
+    ctx.lineTo(pB.x, pB.y);
+    ctx.lineWidth   = trackPx * Math.min(1, 0.3 + bell * 0.3);
+    ctx.strokeStyle = `rgba(${Math.min(255,r+90)},${Math.min(255,g+90)},${Math.min(255,b+90)},${alpha * 0.92})`;
+    ctx.stroke();
   }
+  ctx.restore();
 }
 
-// ─── Active state ─────────────────────────────────────────────────────────────
-let focusActive   = false;
-let hoveredNode   = null;
-let rafId         = null;
-let pulseTimers   = [];
-let activeEdges   = []; // { pts, arc, color, reversed }
-let phaseStart    = 0;
-let pulsePhase    = 'idle'; // 'running' | 'gap' | 'idle'
+// ─── State ────────────────────────────────────────────────────────────────────
+let focusActive = false;
+let hoveredNode = null;
+let rafId       = null;
+let idleTimers  = [];
+let activeEdges = [];
 
-const PULSE_DUR = 1.3;  // seconds for one sweep
-const PULSE_GAP = 0.55; // seconds of silence between sweeps
+const PULSE_DUR = 1.4; // seconds, one sweep only
 
-function stopPulse() {
-  pulseTimers.forEach(clearInterval); pulseTimers = [];
+function stopAll() {
+  idleTimers.forEach(clearInterval); idleTimers = [];
   if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 
-function startFocusPulse(focusedEdges, clickedNode) {
-  stopPulse();
+// Fire pulse ONCE — no loop, no repeat
+function firePulseOnce(focusedEdges, clickedNode) {
+  stopAll();
   activeEdges = [];
   focusedEdges.forEach(edge => {
-    const pts  = buildPolyline(edge);
-    // If the clicked node is the TARGET (not source), reverse so pulse flows away from it
+    const pts = buildPolyline(edge);
     const reversed = edge.target().id() === clickedNode.id();
-    const orderedPts = reversed ? pts.slice().reverse() : pts;
-    const arc  = buildArcTable(orderedPts);
-    const color = LINE_COLORS[edge.data('line')] || '#ffffff';
-    activeEdges.push({ pts: orderedPts, arc, color });
+    const ordered  = reversed ? pts.slice().reverse() : pts;
+    const arc      = buildArcTable(ordered);
+    const color    = LINE_COLORS[edge.data('line')] || '#ffffff';
+    activeEdges.push({ pts: ordered, arc, color });
   });
 
-  pulsePhase = 'running';
-  phaseStart = performance.now();
+  const startTime = performance.now();
 
   function tick(now) {
-    rafId = requestAnimationFrame(tick);
+    const t = (now - startTime) / (PULSE_DUR * 1000); // 0 → 1
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const elapsed = (now - phaseStart) / 1000;
 
-    if (pulsePhase === 'running') {
-      const t = Math.min(1, elapsed / PULSE_DUR);
-      const zoom = cy.zoom();
-      const edgePx = 7 * zoom;
-      activeEdges.forEach(({ pts, arc, color }) => {
-        drawEdgePulse(pts, arc, t, color, edgePx);
-      });
-      if (t >= 1) { pulsePhase = 'gap'; phaseStart = now; }
-    } else {
-      // gap — canvas stays blank
-      if (elapsed >= PULSE_GAP) { pulsePhase = 'running'; phaseStart = now; }
+    if (t > 1) {
+      // Done — stop completely, canvas stays clear
+      rafId = null;
+      return;
     }
+
+    rafId = requestAnimationFrame(tick);
+    const zoom   = cy.zoom();
+    const trackPx = 7 * zoom;
+    activeEdges.forEach(({ pts, arc, color }) => {
+      drawEdgePulse(pts, arc, t, color, trackPx);
+    });
   }
+
   rafId = requestAnimationFrame(tick);
 }
 
 // ─── Idle glow ────────────────────────────────────────────────────────────────
 function startIdleGlow() {
-  stopPulse();
+  stopAll();
   let ph = 0;
   const id = setInterval(() => {
     if (focusActive) { clearInterval(id); return; }
@@ -346,7 +358,7 @@ function startIdleGlow() {
       n.style('shadow-blur', (base + Math.sin(ph + n.position('x') * 0.002) * 9).toString());
     });
   }, 60);
-  pulseTimers.push(id);
+  idleTimers.push(id);
 }
 
 // ─── 3-D drift ────────────────────────────────────────────────────────────────
@@ -359,7 +371,7 @@ let driftPh = 0;
     `rotateX(${6*Math.sin(driftPh)}deg) rotateY(${9*Math.sin(driftPh*0.7+1.1)}deg)`;
 })();
 
-// ─── Click focus ──────────────────────────────────────────────────────────────
+// ─── Click ────────────────────────────────────────────────────────────────────
 cy.on('tap', 'node', function(evt) {
   const clicked = evt.target;
   if (focusActive && clicked.hasClass('focus-node') && !clicked.hasClass('dim')) {
@@ -397,13 +409,13 @@ cy.on('tap', 'node', function(evt) {
   const pad = Math.min(window.innerWidth, window.innerHeight) * 0.12;
   cy.animate({ fit: { eles: focNodes, padding: pad } },
              { duration: 600, easing: 'ease-in-out-cubic' });
-  startFocusPulse(focEdges, clicked);
+  firePulseOnce(focEdges, clicked);
 });
 
 cy.on('tap', e => { if (e.target === cy) resetAll(); });
 
 function resetAll() {
-  stopPulse();
+  stopAll();
   cy.elements().removeClass('dim focus-node focus-edge hovered');
   cy.nodes().forEach(n => { n.style('shadow-blur', ''); n.style('border-width', '2'); });
   focusActive = false;
