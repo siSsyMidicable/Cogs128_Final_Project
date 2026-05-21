@@ -231,24 +231,16 @@ function hexRGB(hex) {
 function getBaseSize(n) { return BASE[n.data('type')] || 42; }
 
 // ─── Build the actual curved polyline for a segments-style edge ───────────────
-// Cytoscape segment-style: the visible path is a polyline through
-//   [srcPos, bp1, bp2, bp3, tgtPos]
-// where bp_i = src + weight_i * (tgt - src) + perpendicular * dist_i
 function buildEdgePolyline(edge) {
   const src = edge.source().position();
   const tgt = edge.target().position();
-
   const dx = tgt.x - src.x;
   const dy = tgt.y - src.y;
   const len = Math.sqrt(dx*dx + dy*dy) || 1;
-  // Perpendicular unit vector
   const px = -dy / len;
   const py =  dx / len;
-
-  // segment-weights: 0.2 0.5 0.8   segment-distances: 40 -40 40
   const weights = [0.2, 0.5, 0.8];
   const dists   = [40, -40, 40];
-
   const pts = [];
   pts.push({ x: src.x, y: src.y });
   for (let i = 0; i < weights.length; i++) {
@@ -261,7 +253,6 @@ function buildEdgePolyline(edge) {
   return pts;
 }
 
-// Build arc-length table for a polyline so we can walk it by distance
 function buildArcTable(pts) {
   const segs = [];
   let total = 0;
@@ -275,7 +266,6 @@ function buildArcTable(pts) {
   return { segs, total };
 }
 
-// Evaluate a point at arc-length fraction t (0-1) along polyline
 function evalPolyline(pts, arc, t) {
   const target = t * arc.total;
   let prev = 0;
@@ -300,7 +290,7 @@ let pulseTimers = [];
 let hoveredNode = null;
 let rafId       = null;
 let breathPhase = 0;
-let activeEdgeData = []; // { pts, arc, rgb, srcRadius }
+let activeEdgeData = [];
 
 function stopAllPulse() { pulseTimers.forEach(clearInterval); pulseTimers = []; }
 function stopRAF() {
@@ -309,15 +299,13 @@ function stopRAF() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 
-// ─── Draw one blood-cell riding its edge groove ───────────────────────────────
-// breathT 0→1→0 = exhale out to far node, then inhale back to clicked node
-// The cell starts at the clicked-node surface (t = srcRadius / arc.total)
-// and travels to the far node (t = 1)
-function drawCell(edgeData, breathT, zoom) {
-  const { pts, arc, rgb, srcRadius } = edgeData;
+// ─── Draw a train light running INSIDE the tunnel (edge line) ─────────────────
+// Paints a tight stroked trail that follows the polyline path exactly —
+// no radial blobs, no glow escaping outside the track width.
+function drawTunnelLight(edgeData, breathT, zoom) {
+  const { pts, arc, rgb, srcRadius, edgeWidth } = edgeData;
 
-  // Map breathT into travel range: start = surface of src node, end = surface of tgt node
-  const startT = Math.min(srcRadius / arc.total, 0.12);
+  const startT = Math.min(srcRadius / arc.total, 0.08);
   const endT   = 1.0;
   const t      = startT + breathT * (endT - startT);
 
@@ -325,45 +313,53 @@ function drawCell(edgeData, breathT, zoom) {
   const sc    = toScreen(world);
   const [r, g, b] = rgb;
 
-  // Size and brightness pulse with breathT
-  const cellR  = (3.5 + breathT * 2.5) * zoom;
-  const alpha  = 0.55 + breathT * 0.45;
-  const glowR  = cellR * 5;
+  // Edge half-width in screen space — light stays inside this boundary
+  const hw = (edgeWidth * zoom) / 2;
 
-  // Outer soft glow
-  const glow = ctx.createRadialGradient(sc.x, sc.y, 0, sc.x, sc.y, glowR);
-  glow.addColorStop(0,   `rgba(${r},${g},${b},${alpha})`);
-  glow.addColorStop(0.3, `rgba(${r},${g},${b},${alpha * 0.6})`);
-  glow.addColorStop(1,   `rgba(${r},${g},${b},0)`);
+  // ── Trail: short stroked segments following the track curve ──
+  const TRAIL_STEPS = 18;
+  const TRAIL_LENGTH = 0.18;
 
+  for (let i = TRAIL_STEPS; i >= 0; i--) {
+    const tTrail = Math.max(startT, t - (i / TRAIL_STEPS) * TRAIL_LENGTH);
+    const tNext  = Math.max(startT, t - ((i - 1) / TRAIL_STEPS) * TRAIL_LENGTH);
+    if (tTrail >= tNext) continue;
+
+    const wA = evalPolyline(pts, arc, tTrail);
+    const wB = evalPolyline(pts, arc, tNext);
+    const sA = toScreen(wA);
+    const sB = toScreen(wB);
+
+    const frac  = 1 - (i / TRAIL_STEPS);
+    const alpha = frac * frac * 0.95;
+
+    ctx.save();
+    ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+    ctx.lineWidth   = hw * 2 * (0.4 + frac * 0.6);
+    ctx.lineCap     = 'round';
+    ctx.lineJoin    = 'round';
+    ctx.beginPath();
+    ctx.moveTo(sA.x, sA.y);
+    ctx.lineTo(sB.x, sB.y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // ── Head: tight white-cored dot clipped to edge width ──
+  const coreR = hw * 0.9;
   ctx.save();
   ctx.beginPath();
-  ctx.arc(sc.x, sc.y, glowR, 0, Math.PI * 2);
-  ctx.fillStyle = glow;
-  ctx.fill();
-
-  // Hard bright core
-  ctx.beginPath();
-  ctx.arc(sc.x, sc.y, cellR, 0, Math.PI * 2);
-  ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+  ctx.arc(sc.x, sc.y, coreR, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(255,255,255,${0.85 + breathT * 0.15})`;
   ctx.fill();
   ctx.restore();
 
-  // Trail — draw 6 ghost cells behind the current position
-  for (let i = 1; i <= 6; i++) {
-    const trailT   = Math.max(startT, t - i * 0.045);
-    const trailW   = evalPolyline(pts, arc, trailT);
-    const trailSc  = toScreen(trailW);
-    const trailA   = alpha * (1 - i / 7) * 0.5;
-    const trailR   = cellR * (1 - i * 0.1);
-    if (trailR <= 0) break;
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(trailSc.x, trailSc.y, trailR, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(${r},${g},${b},${trailA})`;
-    ctx.fill();
-    ctx.restore();
-  }
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(sc.x, sc.y, coreR * 1.6, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(${r},${g},${b},0.55)`;
+  ctx.fill();
+  ctx.restore();
 }
 
 // ─── Energy loop ──────────────────────────────────────────────────────────────
@@ -372,22 +368,20 @@ function startEnergyLoop(focusedNodes, focusedEdges, clickedNode) {
   stopRAF();
   breathPhase = 0;
 
-  const clickedPos  = clickedNode.position();
   const clickedSize = getBaseSize(clickedNode) / 2;
 
   activeEdgeData = [];
   focusedEdges.forEach(edge => {
     const src   = edge.source();
-    const tgt   = edge.target();
     const color = LINE_COLORS[edge.data('line')] || '#ffffff';
     const rgb   = hexRGB(color);
 
-    // Orient so index-0 of pts = clicked node
     let pts = buildEdgePolyline(edge);
     if (src.id() !== clickedNode.id()) pts = pts.slice().reverse();
 
     const arc = buildArcTable(pts);
-    activeEdgeData.push({ pts, arc, rgb, srcRadius: clickedSize });
+    const edgeWidth = 7;
+    activeEdgeData.push({ pts, arc, rgb, srcRadius: clickedSize, edgeWidth });
   });
 
   function tick() {
@@ -395,10 +389,8 @@ function startEnergyLoop(focusedNodes, focusedEdges, clickedNode) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     breathPhase += 0.016;
-    // Smooth sine: 0 → 1 → 0
     const breathT = (Math.sin(breathPhase - Math.PI / 2) + 1) / 2;
 
-    // Pulse focused nodes in sync
     focusedNodes.forEach(n => {
       if (n.hasClass('dim')) return;
       const base = getBaseSize(n);
@@ -407,7 +399,7 @@ function startEnergyLoop(focusedNodes, focusedEdges, clickedNode) {
     });
 
     const zoom = cy.zoom();
-    activeEdgeData.forEach(ed => drawCell(ed, breathT, zoom));
+    activeEdgeData.forEach(ed => drawTunnelLight(ed, breathT, zoom));
   }
 
   rafId = requestAnimationFrame(tick);
@@ -432,18 +424,15 @@ function startIdlePulse() {
 }
 
 // ─── Z-axis universe drift ────────────────────────────────────────────────────
-// Gentle slow tilt in 3D — feels like looking at a star map from a drifting ship
-// Speed and amplitude are calibrated so it never feels dizzy
 const stage = document.getElementById('stage');
 let driftPhase = 0;
-const DRIFT_SPEED = 0.00028; // full rotation every ~22000 frames @ 60fps
-const MAX_X = 6;  // degrees tilt on X axis
-const MAX_Y = 9;  // degrees tilt on Y axis (wider side-to-side)
+const DRIFT_SPEED = 0.00028;
+const MAX_X = 6;
+const MAX_Y = 9;
 
 function driftTick() {
   requestAnimationFrame(driftTick);
   driftPhase += DRIFT_SPEED;
-  // Two independent sine waves at different frequencies so it never repeats cleanly
   const rx = MAX_X * Math.sin(driftPhase * 1.0);
   const ry = MAX_Y * Math.sin(driftPhase * 0.7 + 1.1);
   stage.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg)`;
@@ -487,7 +476,6 @@ cy.on('tap', 'node', function(evt) {
 
   focusActive = true;
 
-  // Responsive fit — padding scales with the smaller screen dimension
   const pad = Math.min(window.innerWidth, window.innerHeight) * 0.12;
   cy.animate(
     { fit: { eles: focNodes, padding: pad } },
