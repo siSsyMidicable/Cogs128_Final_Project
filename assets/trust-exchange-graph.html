@@ -11,22 +11,12 @@ html, body {
   font-family: Inter, Arial, sans-serif;
   background: radial-gradient(circle at center, #1a2338 0%, #0d1320 35%, #05080f 70%, #000 100%);
 }
-#scene {
-  width: 100%; height: 100%;
-  perspective: 1800px;
-  perspective-origin: 50% 50%;
-}
-#stage {
-  width: 100%; height: 100%;
-  transform-style: preserve-3d;
-  will-change: transform;
-}
+#scene { width: 100%; height: 100%; perspective: 1800px; perspective-origin: 50% 50%; }
+#stage { width: 100%; height: 100%; transform-style: preserve-3d; will-change: transform; }
 #cy { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
 #energy-canvas {
-  position: absolute; top: 0; left: 0;
-  width: 100%; height: 100%;
-  pointer-events: none;
-  z-index: 10;
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 10;
 }
 #glass {
   position: fixed; top: 18px; left: 18px; width: 260px;
@@ -44,13 +34,10 @@ h1 { margin-top: 0; font-size: 20px; font-weight: 800; letter-spacing: 0.02em; }
 </style>
 </head>
 <body>
-
-<div id="scene">
-  <div id="stage">
-    <div id="cy"></div>
-    <canvas id="energy-canvas"></canvas>
-  </div>
-</div>
+<div id="scene"><div id="stage">
+  <div id="cy"></div>
+  <canvas id="energy-canvas"></canvas>
+</div></div>
 
 <div id="glass">
   <h1>Trust Exchange</h1>
@@ -64,18 +51,21 @@ h1 { margin-top: 0; font-size: 20px; font-weight: 800; letter-spacing: 0.02em; }
 </div>
 
 <script>
-// ─── Legend fade ───────────────────────────────────────────────────────────────
 const glass = document.getElementById('glass');
 let hideT = setTimeout(() => glass.classList.add('hidden'), 3500);
 glass.addEventListener('mouseenter', () => { clearTimeout(hideT); glass.classList.remove('hidden'); });
 glass.addEventListener('mouseleave', () => { hideT = setTimeout(() => glass.classList.add('hidden'), 2000); });
 
-// ─── Constants ────────────────────────────────────────────────────────────────
 const BASE        = { participant: 90, trust: 42, fairness: 42, skill: 34 };
 const HOVER_SIZE  = 115;
 const LINE_COLORS = { skill:'#00ffa6', trust:'#ffb347', fairness:'#ff4fa3' };
+// How wide (in arc-fraction) the glowing window is on the track
+const PULSE_WIDTH = 0.22;
+// Seconds for one pulse to travel the full edge length
+const PULSE_DURATION = 1.1;
+// Gap between pulses (seconds) — after one finishes, wait this long before next
+const PULSE_GAP = 0.7;
 
-// ─── Cytoscape ────────────────────────────────────────────────────────────────
 const cy = cytoscape({
   container: document.getElementById('cy'),
   elements: [
@@ -149,72 +139,37 @@ const cy = cytoscape({
     { data:{ source:'linda',   target:'expectations', line:'fairness' } }
   ],
   style: [
-    {
-      selector: 'node',
-      style: {
-        'label': 'data(label)',
-        'font-size': 11,
-        'font-weight': 600,
-        'text-wrap': 'wrap',
-        'text-max-width': '100px',
-        'color': 'white',
-        'text-outline-width': 3,
-        'text-outline-color': '#000',
-        'text-valign': 'center',
-        'text-halign': 'center',
-        'border-width': 2,
-        'border-color': 'rgba(255,255,255,0.15)',
-        'transition-property': 'opacity, width, height, font-size, text-outline-width, border-width, shadow-blur',
-        'transition-duration': '300ms'
-      }
-    },
-    { selector: 'node[type="participant"]', style: {
-      'background-color': '#38bdf8', 'width': 90, 'height': 90,
-      'shadow-color': '#38bdf8', 'shadow-blur': 40, 'shadow-opacity': 1
+    { selector: 'node', style: {
+      'label': 'data(label)', 'font-size': 11, 'font-weight': 600,
+      'text-wrap': 'wrap', 'text-max-width': '100px',
+      'color': 'white', 'text-outline-width': 3, 'text-outline-color': '#000',
+      'text-valign': 'center', 'text-halign': 'center',
+      'border-width': 2, 'border-color': 'rgba(255,255,255,0.15)',
+      'transition-property': 'opacity, width, height, font-size, text-outline-width, border-width, shadow-blur',
+      'transition-duration': '300ms'
     }},
-    { selector: 'node[type="skill"]', style: {
-      'background-color': '#00ffa6', 'width': 34, 'height': 34,
-      'shadow-color': '#00ffa6', 'shadow-blur': 18, 'shadow-opacity': 0.8
-    }},
-    { selector: 'node[type="trust"]', style: {
-      'background-color': '#ffb347', 'width': 42, 'height': 42,
-      'shadow-color': '#ffb347', 'shadow-blur': 25, 'shadow-opacity': 0.9
-    }},
-    { selector: 'node[type="fairness"]', style: {
-      'background-color': '#ff4fa3', 'width': 42, 'height': 42,
-      'shadow-color': '#ff4fa3', 'shadow-blur': 25, 'shadow-opacity': 0.9
-    }},
+    { selector: 'node[type="participant"]', style: { 'background-color': '#38bdf8', 'width': 90, 'height': 90, 'shadow-color': '#38bdf8', 'shadow-blur': 40, 'shadow-opacity': 1 }},
+    { selector: 'node[type="skill"]',       style: { 'background-color': '#00ffa6', 'width': 34, 'height': 34, 'shadow-color': '#00ffa6', 'shadow-blur': 18, 'shadow-opacity': 0.8 }},
+    { selector: 'node[type="trust"]',       style: { 'background-color': '#ffb347', 'width': 42, 'height': 42, 'shadow-color': '#ffb347', 'shadow-blur': 25, 'shadow-opacity': 0.9 }},
+    { selector: 'node[type="fairness"]',    style: { 'background-color': '#ff4fa3', 'width': 42, 'height': 42, 'shadow-color': '#ff4fa3', 'shadow-blur': 25, 'shadow-opacity': 0.9 }},
     { selector: 'edge', style: {
       'curve-style': 'segments',
       'segment-distances': '40 -40 40', 'segment-weights': '0.2 0.5 0.8',
       'width': 5, 'opacity': 0.85, 'line-cap': 'round',
-      'transition-property': 'opacity, width, shadow-blur',
-      'transition-duration': '300ms'
+      'transition-property': 'opacity, width, shadow-blur', 'transition-duration': '300ms'
     }},
-    { selector: 'edge[line="skill"]',    style: { 'line-color': '#00ffa6', 'shadow-color': '#00ffa6', 'shadow-blur': 10, 'shadow-opacity': 0.5 } },
-    { selector: 'edge[line="trust"]',    style: { 'line-color': '#ffb347', 'shadow-color': '#ffb347', 'shadow-blur': 10, 'shadow-opacity': 0.5 } },
-    { selector: 'edge[line="fairness"]', style: { 'line-color': '#ff4fa3', 'shadow-color': '#ff4fa3', 'shadow-blur': 10, 'shadow-opacity': 0.5 } },
-    { selector: '.dim', style: { 'opacity': 0.06, 'text-opacity': 0 } },
-    { selector: '.focus-node', style: {
-      'opacity': 1, 'font-size': 15, 'font-weight': 800,
-      'text-outline-width': 4, 'text-outline-color': '#000',
-      'color': '#ffffff', 'border-width': 4,
-      'border-color': 'rgba(255,255,255,0.7)',
-      'shadow-blur': 60, 'shadow-opacity': 1, 'text-opacity': 1
-    }},
-    { selector: '.focus-edge', style: { 'opacity': 1, 'width': 7, 'shadow-blur': 20, 'shadow-opacity': 0.9 } },
-    { selector: '.hovered', style: {
-      'font-size': 17, 'font-weight': 900,
-      'text-outline-width': 5, 'text-outline-color': '#000',
-      'color': '#ffffff', 'text-opacity': 1,
-      'border-width': 4, 'border-color': 'rgba(255,255,255,0.9)',
-      'shadow-blur': 70, 'shadow-opacity': 1
-    }}
+    { selector: 'edge[line="skill"]',    style: { 'line-color': '#00ffa6', 'shadow-color': '#00ffa6', 'shadow-blur': 10, 'shadow-opacity': 0.5 }},
+    { selector: 'edge[line="trust"]',    style: { 'line-color': '#ffb347', 'shadow-color': '#ffb347', 'shadow-blur': 10, 'shadow-opacity': 0.5 }},
+    { selector: 'edge[line="fairness"]', style: { 'line-color': '#ff4fa3', 'shadow-color': '#ff4fa3', 'shadow-blur': 10, 'shadow-opacity': 0.5 }},
+    { selector: '.dim',        style: { 'opacity': 0.06, 'text-opacity': 0 }},
+    { selector: '.focus-node', style: { 'opacity': 1, 'font-size': 15, 'font-weight': 800, 'text-outline-width': 4, 'text-outline-color': '#000', 'color': '#ffffff', 'border-width': 4, 'border-color': 'rgba(255,255,255,0.7)', 'shadow-blur': 60, 'shadow-opacity': 1, 'text-opacity': 1 }},
+    { selector: '.focus-edge', style: { 'opacity': 1, 'width': 7, 'shadow-blur': 20, 'shadow-opacity': 0.9 }},
+    { selector: '.hovered',    style: { 'font-size': 17, 'font-weight': 900, 'text-outline-width': 5, 'text-outline-color': '#000', 'color': '#ffffff', 'text-opacity': 1, 'border-width': 4, 'border-color': 'rgba(255,255,255,0.9)', 'shadow-blur': 70, 'shadow-opacity': 1 }}
   ],
   layout: { name: 'preset' }
 });
 
-// ─── Canvas ───────────────────────────────────────────────────────────────────
+// ─── Canvas setup ────────────────────────────────────────────────────────────
 const canvas = document.getElementById('energy-canvas');
 const ctx    = canvas.getContext('2d');
 function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
@@ -230,58 +185,40 @@ function hexRGB(hex) {
 }
 function getBaseSize(n) { return BASE[n.data('type')] || 42; }
 
-// ─── Build the actual curved polyline for a segments-style edge ───────────────
+// ─── Polyline helpers ─────────────────────────────────────────────────────────
 function buildEdgePolyline(edge) {
   const src = edge.source().position();
   const tgt = edge.target().position();
-  const dx = tgt.x - src.x;
-  const dy = tgt.y - src.y;
+  const dx = tgt.x - src.x, dy = tgt.y - src.y;
   const len = Math.sqrt(dx*dx + dy*dy) || 1;
-  const px = -dy / len;
-  const py =  dx / len;
-  const weights = [0.2, 0.5, 0.8];
-  const dists   = [40, -40, 40];
-  const pts = [];
-  pts.push({ x: src.x, y: src.y });
-  for (let i = 0; i < weights.length; i++) {
-    pts.push({
-      x: src.x + weights[i] * dx + dists[i] * px,
-      y: src.y + weights[i] * dy + dists[i] * py
-    });
-  }
+  const px = -dy/len, py = dx/len;
+  const weights = [0.2, 0.5, 0.8], dists = [40, -40, 40];
+  const pts = [{ x: src.x, y: src.y }];
+  for (let i = 0; i < 3; i++)
+    pts.push({ x: src.x + weights[i]*dx + dists[i]*px, y: src.y + weights[i]*dy + dists[i]*py });
   pts.push({ x: tgt.x, y: tgt.y });
   return pts;
 }
-
 function buildArcTable(pts) {
-  const segs = [];
-  let total = 0;
+  const segs = []; let total = 0;
   for (let i = 1; i < pts.length; i++) {
-    const dx = pts[i].x - pts[i-1].x;
-    const dy = pts[i].y - pts[i-1].y;
-    const d  = Math.sqrt(dx*dx + dy*dy);
-    total += d;
-    segs.push({ len: d, cumLen: total });
+    const dx = pts[i].x-pts[i-1].x, dy = pts[i].y-pts[i-1].y;
+    const d = Math.sqrt(dx*dx+dy*dy);
+    total += d; segs.push({ len:d, cumLen:total });
   }
   return { segs, total };
 }
-
 function evalPolyline(pts, arc, t) {
-  const target = t * arc.total;
-  let prev = 0;
+  const target = t * arc.total; let prev = 0;
   for (let i = 0; i < arc.segs.length; i++) {
     const { len, cumLen } = arc.segs[i];
-    if (target <= cumLen || i === arc.segs.length - 1) {
-      const f = len > 0 ? (target - prev) / len : 0;
-      const p0 = pts[i],  p1 = pts[i+1];
-      return {
-        x: p0.x + f * (p1.x - p0.x),
-        y: p0.y + f * (p1.y - p0.y)
-      };
+    if (target <= cumLen || i === arc.segs.length-1) {
+      const f = len > 0 ? (target-prev)/len : 0;
+      return { x: pts[i].x + f*(pts[i+1].x-pts[i].x), y: pts[i].y + f*(pts[i+1].y-pts[i].y) };
     }
     prev = cumLen;
   }
-  return pts[pts.length - 1];
+  return pts[pts.length-1];
 }
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -289,8 +226,10 @@ let focusActive = false;
 let pulseTimers = [];
 let hoveredNode = null;
 let rafId       = null;
-let breathPhase = 0;
-let activeEdgeData = [];
+let activeEdgeData  = []; // built once per focus click
+let pulseStartTime  = null; // performance.now() when current pulse started
+let pulsePhase      = 'running'; // 'running' | 'gap'
+let phaseStartTime  = null;
 
 function stopAllPulse() { pulseTimers.forEach(clearInterval); pulseTimers = []; }
 function stopRAF() {
@@ -299,107 +238,116 @@ function stopRAF() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 
-// ─── Draw a train light running INSIDE the tunnel (edge line) ─────────────────
-// Paints a tight stroked trail that follows the polyline path exactly —
-// no radial blobs, no glow escaping outside the track width.
-function drawTunnelLight(edgeData, breathT, zoom) {
-  const { pts, arc, rgb, srcRadius, edgeWidth } = edgeData;
-
-  const startT = Math.min(srcRadius / arc.total, 0.08);
-  const endT   = 1.0;
-  const t      = startT + breathT * (endT - startT);
-
-  const world = evalPolyline(pts, arc, t);
-  const sc    = toScreen(world);
+// ─── Draw flowing pulse — NO beam, NO back-and-forth ─────────────────────────
+// A glowing window (PULSE_WIDTH wide in arc-fraction) sweeps from 0→1 once,
+// fades out at the end, then restarts after a gap. The "window" is drawn by
+// walking the polyline and painting stroked segments whose opacity follows
+// a smooth bell-curve based on distance from the pulse center.
+function drawFlowPulse(edgeData, pulseT, zoom) {
+  // pulseT: 0.0 = pulse center just left the source
+  //         1.0 = pulse center just reached the target
+  // We extend range slightly so the tail enters cleanly and head exits cleanly
+  const centerT = pulseT; // 0→1 linearly, driven by clock
+  const { pts, arc, rgb, edgeWidthPx } = edgeData;
   const [r, g, b] = rgb;
 
-  // Edge half-width in screen space — light stays inside this boundary
-  const hw = (edgeWidth * zoom) / 2;
+  // How many sample segments to paint along the window
+  const STEPS = 40;
+  const hw = (edgeWidthPx * zoom) / 2; // half edge width in screen px
 
-  // ── Trail: short stroked segments following the track curve ──
-  const TRAIL_STEPS = 18;
-  const TRAIL_LENGTH = 0.18;
+  for (let i = 0; i <= STEPS; i++) {
+    // fractional position of this sample along the full arc
+    const sampleT = centerT - PULSE_WIDTH/2 + (i/STEPS) * PULSE_WIDTH;
+    const nextT   = centerT - PULSE_WIDTH/2 + ((i+1)/STEPS) * PULSE_WIDTH;
+    if (sampleT < 0 || nextT > 1.02) continue;
+    const clampedA = Math.max(0, Math.min(1, sampleT));
+    const clampedB = Math.max(0, Math.min(1, nextT));
+    if (clampedA >= clampedB) continue;
 
-  for (let i = TRAIL_STEPS; i >= 0; i--) {
-    const tTrail = Math.max(startT, t - (i / TRAIL_STEPS) * TRAIL_LENGTH);
-    const tNext  = Math.max(startT, t - ((i - 1) / TRAIL_STEPS) * TRAIL_LENGTH);
-    if (tTrail >= tNext) continue;
-
-    const wA = evalPolyline(pts, arc, tTrail);
-    const wB = evalPolyline(pts, arc, tNext);
+    const wA = evalPolyline(pts, arc, clampedA);
+    const wB = evalPolyline(pts, arc, clampedB);
     const sA = toScreen(wA);
     const sB = toScreen(wB);
 
-    const frac  = 1 - (i / TRAIL_STEPS);
-    const alpha = frac * frac * 0.95;
+    // Bell-curve opacity: brightest at center, zero at edges of window
+    // We use sampleT's distance from centerT, normalized by half-width
+    const distFromCenter = Math.abs((sampleT - centerT) / (PULSE_WIDTH / 2));
+    // smoothstep fade: 0 at edge (dist=1), 1 at center (dist=0)
+    const bell = Math.max(0, 1 - distFromCenter * distFromCenter);
+
+    // Also fade out the whole pulse as it reaches the end (so it dissolves into the node)
+    const endFade = centerT > 0.75 ? Math.max(0, (1 - centerT) / 0.25) : 1;
+    // And fade in as it leaves the source
+    const startFade = centerT < 0.1 ? centerT / 0.1 : 1;
+
+    const alpha = bell * endFade * startFade * 0.9;
+    if (alpha < 0.01) continue;
 
     ctx.save();
     ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
-    ctx.lineWidth   = hw * 2 * (0.4 + frac * 0.6);
-    ctx.lineCap     = 'round';
-    ctx.lineJoin    = 'round';
+    // Width tapers at ends of window too
+    ctx.lineWidth = hw * 2 * (0.5 + bell * 0.5);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     ctx.beginPath();
     ctx.moveTo(sA.x, sA.y);
     ctx.lineTo(sB.x, sB.y);
     ctx.stroke();
     ctx.restore();
   }
-
-  // ── Head: tight white-cored dot clipped to edge width ──
-  const coreR = hw * 0.9;
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(sc.x, sc.y, coreR, 0, Math.PI * 2);
-  ctx.fillStyle = `rgba(255,255,255,${0.85 + breathT * 0.15})`;
-  ctx.fill();
-  ctx.restore();
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(sc.x, sc.y, coreR * 1.6, 0, Math.PI * 2);
-  ctx.fillStyle = `rgba(${r},${g},${b},0.55)`;
-  ctx.fill();
-  ctx.restore();
 }
 
 // ─── Energy loop ──────────────────────────────────────────────────────────────
 function startEnergyLoop(focusedNodes, focusedEdges, clickedNode) {
   stopAllPulse();
   stopRAF();
-  breathPhase = 0;
 
   const clickedSize = getBaseSize(clickedNode) / 2;
-
   activeEdgeData = [];
   focusedEdges.forEach(edge => {
     const src   = edge.source();
     const color = LINE_COLORS[edge.data('line')] || '#ffffff';
     const rgb   = hexRGB(color);
-
     let pts = buildEdgePolyline(edge);
     if (src.id() !== clickedNode.id()) pts = pts.slice().reverse();
-
     const arc = buildArcTable(pts);
-    const edgeWidth = 7;
-    activeEdgeData.push({ pts, arc, rgb, srcRadius: clickedSize, edgeWidth });
+    activeEdgeData.push({ pts, arc, rgb, edgeWidthPx: 7 });
   });
 
-  function tick() {
+  pulsePhase = 'running';
+  phaseStartTime = performance.now();
+
+  function tick(now) {
     rafId = requestAnimationFrame(tick);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    breathPhase += 0.016;
-    const breathT = (Math.sin(breathPhase - Math.PI / 2) + 1) / 2;
+    const elapsed = (now - phaseStartTime) / 1000; // seconds
 
+    if (pulsePhase === 'running') {
+      // pulseT goes linearly 0→1 over PULSE_DURATION seconds
+      const pulseT = Math.min(1, elapsed / PULSE_DURATION);
+      const zoom = cy.zoom();
+      activeEdgeData.forEach(ed => drawFlowPulse(ed, pulseT, zoom));
+
+      if (pulseT >= 1) {
+        // Pulse finished — enter gap phase
+        pulsePhase = 'gap';
+        phaseStartTime = now;
+      }
+    } else {
+      // Gap phase — canvas stays clear, wait then restart
+      if (elapsed >= PULSE_GAP) {
+        pulsePhase = 'running';
+        phaseStartTime = now;
+      }
+    }
+
+    // Keep node glow steady while focused (no pulsing, just constant bright)
     focusedNodes.forEach(n => {
       if (n.hasClass('dim')) return;
       const base = getBaseSize(n);
-      n.style('shadow-blur',  (base * 0.4 + breathT * base * 0.8).toString());
-      n.style('border-width', (2 + breathT * 4).toString());
+      n.style('shadow-blur', (base * 0.9).toString());
     });
-
-    const zoom = cy.zoom();
-    activeEdgeData.forEach(ed => drawTunnelLight(ed, breathT, zoom));
   }
 
   rafId = requestAnimationFrame(tick);
@@ -423,28 +371,20 @@ function startIdlePulse() {
   pulseTimers.push(id);
 }
 
-// ─── Z-axis universe drift ────────────────────────────────────────────────────
+// ─── 3D drift ─────────────────────────────────────────────────────────────────
 const stage = document.getElementById('stage');
 let driftPhase = 0;
-const DRIFT_SPEED = 0.00028;
-const MAX_X = 6;
-const MAX_Y = 9;
-
 function driftTick() {
   requestAnimationFrame(driftTick);
-  driftPhase += DRIFT_SPEED;
-  const rx = MAX_X * Math.sin(driftPhase * 1.0);
-  const ry = MAX_Y * Math.sin(driftPhase * 0.7 + 1.1);
-  stage.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg)`;
+  driftPhase += 0.00028;
+  stage.style.transform = `rotateX(${6*Math.sin(driftPhase)}deg) rotateY(${9*Math.sin(driftPhase*0.7+1.1)}deg)`;
 }
 driftTick();
 
 // ─── Click ────────────────────────────────────────────────────────────────────
 cy.on('tap', 'node', function(evt) {
   const clicked = evt.target;
-  if (focusActive && clicked.hasClass('focus-node') && !clicked.hasClass('dim')) {
-    resetAll(); return;
-  }
+  if (focusActive && clicked.hasClass('focus-node') && !clicked.hasClass('dim')) { resetAll(); return; }
 
   cy.elements().removeClass('dim focus-node focus-edge hovered');
   cy.nodes().addClass('dim');
@@ -463,8 +403,7 @@ cy.on('tap', 'node', function(evt) {
     node.connectedEdges().forEach(edge => {
       edge.connectedNodes().forEach(n => {
         if (!visited.has(n.id())) {
-          visited.add(n.id());
-          queue.push(n);
+          visited.add(n.id()); queue.push(n);
           n.removeClass('dim').addClass('focus-node');
           focNodes = focNodes.merge(n);
         }
@@ -475,49 +414,37 @@ cy.on('tap', 'node', function(evt) {
   }
 
   focusActive = true;
-
   const pad = Math.min(window.innerWidth, window.innerHeight) * 0.12;
-  cy.animate(
-    { fit: { eles: focNodes, padding: pad } },
-    { duration: 600, easing: 'ease-in-out-cubic' }
-  );
-
+  cy.animate({ fit: { eles: focNodes, padding: pad } }, { duration: 600, easing: 'ease-in-out-cubic' });
   startEnergyLoop(focNodes, focEdges, clicked);
 });
 
 cy.on('tap', function(e) { if (e.target === cy) resetAll(); });
 
 function resetAll() {
-  stopAllPulse();
-  stopRAF();
+  stopAllPulse(); stopRAF();
   cy.elements().removeClass('dim focus-node focus-edge hovered');
   cy.nodes().forEach(n => { n.style('shadow-blur', ''); n.style('border-width', '2'); });
   focusActive = false;
   const pad = Math.min(window.innerWidth, window.innerHeight) * 0.07;
-  cy.animate(
-    { fit: { eles: cy.nodes(), padding: pad } },
-    { duration: 500, easing: 'ease-in-out-cubic' }
-  );
+  cy.animate({ fit: { eles: cy.nodes(), padding: pad } }, { duration: 500, easing: 'ease-in-out-cubic' });
   startIdlePulse();
 }
 
 // ─── Hover ────────────────────────────────────────────────────────────────────
 cy.on('mouseover', 'node', function(evt) {
-  const node = evt.target;
-  hoveredNode = node;
+  const node = evt.target; hoveredNode = node;
   if (node.hasClass('dim')) return;
   node.addClass('hovered');
-  const big = node.data('type') === 'participant' ? HOVER_SIZE + 20 : HOVER_SIZE;
+  const big = node.data('type') === 'participant' ? HOVER_SIZE+20 : HOVER_SIZE;
   node.stop().animate({ style: { width: big, height: big } }, { duration: 180 });
 });
 cy.on('mouseout', 'node', function(evt) {
-  const node = evt.target;
-  hoveredNode = null;
+  const node = evt.target; hoveredNode = null;
   node.removeClass('hovered');
   node.stop().animate({ style: { width: getBaseSize(node), height: getBaseSize(node) } }, { duration: 180 });
 });
 
-// ─── Boot ─────────────────────────────────────────────────────────────────────
 startIdlePulse();
 </script>
 </body>
