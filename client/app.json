@@ -3,9 +3,11 @@
     "name": "SkillSwap",
     "slug": "skillswap",
     "version": "1.0.0",
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "experiments": {
+      "baseUrl": "https://sissymidicable.github.io/Cogs128_Final_Project/"
+    },
+
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.skillswap.client"
