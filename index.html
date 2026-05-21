@@ -63,6 +63,48 @@ h1 {
   line-height: 1.7;
 }
 
+/* Launch App hero button */
+.launch-wrap {
+  padding-left: 44px;
+  margin-bottom: 56px;
+}
+
+.launch-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  font-family: 'JetBrains Mono', 'Fira Mono', 'Courier New', monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #05080f;
+  background: #00ffa6;
+  padding: 14px 28px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.12s, transform 0.1s;
+}
+
+.launch-btn:hover {
+  background: #00e894;
+  transform: translateY(-1px);
+}
+
+.launch-btn::before {
+  content: '▶';
+  font-size: 0.7rem;
+}
+
+.launch-note {
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 0.72rem;
+  color: #2d3748;
+  margin-top: 10px;
+  letter-spacing: 0.04em;
+}
+
 .rail {
   position: relative;
   width: 100%;
@@ -145,7 +187,7 @@ h1 {
 .card-tag::before { content: '▶ '; }
 
 .s1 { --rail-color: #38bdf8; --branch-w: 52px;  --card-indent: 82px;  }
-.s2 { --rail-color: #00ffa6; --branch-w: 88px;  --card-indent: 118px; }
+.s2 { --rail-color: #a78bfa; --branch-w: 88px;  --card-indent: 118px; }
 .s3 { --rail-color: #ffb347; --branch-w: 38px;  --card-indent: 68px;  }
 .s4 { --rail-color: #ff4fa3; --branch-w: 70px;  --card-indent: 100px; }
 
@@ -200,6 +242,14 @@ h1 {
   <p class="sub">A peer-to-peer skill exchange platform built on algorithmic trust, transparent fairness scoring, and community-verified exchanges.</p>
 </div>
 
+<!-- Launch App CTA -->
+<div class="launch-wrap">
+  <a class="launch-btn" href="https://skillswap.expo.dev" target="_blank" rel="noopener noreferrer">
+    Launch SkillSwap App
+  </a>
+  <p class="launch-note">Opens the live web app in your browser</p>
+</div>
+
 <div class="rail">
 
   <div class="station s1">
@@ -211,7 +261,7 @@ h1 {
   </div>
 
   <div class="station s2">
-    <a class="card" href="assets/trust-exchange-graph.html">
+    <a class="card" href="assets/skillswap_3d_clean.html">
       <div class="card-title">3D Match Visualization</div>
       <div class="card-desc">Three-dimensional view of the SkillSwap matching model — skill nodes, trust vectors, and fairness weights rendered as an interactive network graph.</div>
       <span class="card-tag">3D View</span>
@@ -219,7 +269,7 @@ h1 {
   </div>
 
   <div class="station s3">
-    <a class="card" href="docs/FINAL_REPORT.html">
+    <a class="card" href="https://github.com/siSsyMidicable/Cogs128_Final_Project/blob/main/docs/FINAL_REPORT.md" target="_blank" rel="noopener noreferrer">
       <div class="card-title">Final Report</div>
       <div class="card-desc">Complete 30-point rubric document covering proposal, interviews, personas, prototype analysis, user testing evaluation, and project management.</div>
       <span class="card-tag">30 pts</span>
@@ -227,7 +277,7 @@ h1 {
   </div>
 
   <div class="station s4">
-    <a class="card" href="https://github.com/siSsyMidicable/Cogs128_Final_Project" target="_blank" rel="noopener">
+    <a class="card" href="https://github.com/siSsyMidicable/Cogs128_Final_Project" target="_blank" rel="noopener noreferrer">
       <div class="card-title">GitHub Repository</div>
       <div class="card-desc">Full source code — React Native / Expo client, matching engine, server, interview data, and all project documentation.</div>
       <span class="card-tag">Source</span>
