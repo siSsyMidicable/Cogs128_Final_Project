@@ -19,6 +19,7 @@
     "expo-image-picker": "~17.0.11",
     "expo-linking": "~8.0.12",
     "expo-router": "6.0.23",
+    "gh-pages": "^6.3.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-hook-form": "^7.72.1",
@@ -39,4 +40,18 @@
   "overrides": {
     "@xmldom/xmldom": "0.8.12"
   }
+
+  {
+  "name": "your-project",
+  "version": "1.0.0",
+  "private": true,
+  "overrides": {
+    "@xmldom/xmldom": "0.8.12"
+  },
+  "scripts": {
+    "build": "expo export --platform web",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
+  }
+}
 }
